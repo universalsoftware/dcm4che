@@ -60,7 +60,7 @@ import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageInputStreamImpl;
 
 import org.dcm4che.data.Attributes;
-import org.dcm4che.data.BulkDataLocator;
+import org.dcm4che.data.BulkData;
 import org.dcm4che.data.Fragments;
 import org.dcm4che.data.Sequence;
 import org.dcm4che.data.Tag;
@@ -104,7 +104,7 @@ public class DicomImageReader extends ImageReader {
 
     private DicomInputStream dis;
 
-    private BulkDataLocator pixeldata;
+    private BulkData pixeldata;
 
     private final VR.Holder pixeldataVR = new VR.Holder();
 
@@ -380,40 +380,57 @@ public class DicomImageReader extends ImageReader {
         Attributes imgAttrs = metadata.getAttributes();
         StoredValue sv = StoredValue.valueOf(imgAttrs);
         LookupTableFactory lutParam = new LookupTableFactory(sv);
-        if (param instanceof DicomImageReadParam) {
-            DicomImageReadParam dParam = (DicomImageReadParam) param;
-            Attributes psAttrs = dParam.getPresentationState();
-            if (psAttrs != null) {
-                lutParam.setModalityLUT(psAttrs);
-                lutParam.setVOI(
-                        selectVOILUT(psAttrs,
-                                imgAttrs.getString(Tag.SOPInstanceUID),
-                                frameIndex+1),
-                        0, 0, false);
-                lutParam.setPresentationLUT(psAttrs);
-            } else {
-                lutParam.setModalityLUT(imgAttrs);
-                if (dParam.getWindowWidth() != 0) {
-                    lutParam.setWindowCenter(dParam.getWindowCenter());
-                    lutParam.setWindowWidth(dParam.getWindowWidth());
-                } else
-                    lutParam.setVOI(imgAttrs,
-                        dParam.getWindowIndex(),
-                        dParam.getVOILUTIndex(),
-                        dParam.isPreferWindow());
-                if (dParam.isAutoWindowing())
-                    lutParam.autoWindowing(imgAttrs, raster);
-                lutParam.setPresentationLUT(imgAttrs);
-            }
+        DicomImageReadParam dParam = param instanceof DicomImageReadParam
+                ? (DicomImageReadParam) param
+                : new DicomImageReadParam();
+        Attributes psAttrs = dParam.getPresentationState();
+        if (psAttrs != null) {
+            lutParam.setModalityLUT(psAttrs);
+            lutParam.setVOI(
+                    selectVOILUT(psAttrs,
+                            imgAttrs.getString(Tag.SOPInstanceUID),
+                            frameIndex+1),
+                    0, 0, false);
+            lutParam.setPresentationLUT(psAttrs);
         } else {
-            lutParam.setModalityLUT(imgAttrs);
-            lutParam.setVOI(imgAttrs, 0, 0, true);
-            lutParam.autoWindowing(imgAttrs, raster);
+            Attributes sharedFctGroups = imgAttrs.getNestedDataset(
+                    Tag.SharedFunctionalGroupsSequence);
+            Attributes frameFctGroups = imgAttrs.getNestedDataset(
+                    Tag.PerFrameFunctionalGroupsSequence, frameIndex);
+            lutParam.setModalityLUT(
+                    selectFctGroup(imgAttrs, sharedFctGroups, frameFctGroups,
+                            Tag.PixelValueTransformationSequence));
+            if (dParam.getWindowWidth() != 0) {
+                lutParam.setWindowCenter(dParam.getWindowCenter());
+                lutParam.setWindowWidth(dParam.getWindowWidth());
+            } else
+                lutParam.setVOI(
+                    selectFctGroup(imgAttrs, sharedFctGroups, frameFctGroups,
+                            Tag.FrameVOILUTSequence),
+                    dParam.getWindowIndex(),
+                    dParam.getVOILUTIndex(),
+                    dParam.isPreferWindow());
+            if (dParam.isAutoWindowing())
+                lutParam.autoWindowing(imgAttrs, raster);
             lutParam.setPresentationLUT(imgAttrs);
         }
         LookupTable lut = lutParam.createLUT(outBits);
         lut.lookup(raster, destRaster);
         return destRaster;
+    }
+
+    private Attributes selectFctGroup(Attributes imgAttrs,
+            Attributes sharedFctGroups, 
+            Attributes frameFctGroups,
+            int tag) {
+        if (frameFctGroups == null) {
+            return imgAttrs;
+        }
+        Attributes group = frameFctGroups.getNestedDataset(tag);
+        if (group == null && sharedFctGroups != null) {
+            group = sharedFctGroups.getNestedDataset(tag);
+        }
+        return group != null ? group : imgAttrs;
     }
 
     private Attributes selectVOILUT(Attributes psAttrs, String iuid, int frame) {
@@ -446,7 +463,7 @@ public class DicomImageReader extends ImageReader {
             throw new IllegalStateException("Input not set");
 
         dis = new DicomInputStream(new ImageInputStreamAdapter(iis));
-        dis.setIncludeBulkData(IncludeBulkData.LOCATOR);
+        dis.setIncludeBulkData(IncludeBulkData.URI);
         dis.setBulkDataDescriptor(BulkDataDescriptor.PIXELDATA);
         dis.setURI("java:iis"); // avoid copy of pixeldata to temporary file
         Attributes fmi = dis.readFileMetaInformation();
@@ -465,12 +482,12 @@ public class DicomImageReader extends ImageReader {
                                           : DataBuffer.TYPE_USHORT;
             pmi = PhotometricInterpretation.fromString(
                     ds.getString(Tag.PhotometricInterpretation, "MONOCHROME2"));
-            if (pixeldata instanceof BulkDataLocator) {
+            if (pixeldata instanceof BulkData) {
                 iis.setByteOrder(ds.bigEndian() 
                         ? ByteOrder.BIG_ENDIAN
                         : ByteOrder.LITTLE_ENDIAN);
                 this.frameLength = pmi.frameLength(width, height, samples, bitsAllocated);
-                this.pixeldata = (BulkDataLocator) pixeldata;
+                this.pixeldata = (BulkData) pixeldata;
             } else {
                 String tsuid = dis.getTransferSyntax();
                 ImageReaderParam param =

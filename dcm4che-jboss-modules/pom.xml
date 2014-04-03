@@ -3,7 +3,7 @@
   <parent>
     <groupId>org.dcm4che</groupId>
     <artifactId>dcm4che-parent</artifactId>
-    <version>3.2.0</version>
+    <version>3.2.1</version>
   </parent>
   <artifactId>dcm4che-jboss-modules</artifactId>
   <packaging>pom</packaging>
@@ -92,6 +92,11 @@
     <dependency>
       <groupId>org.dcm4che</groupId>
       <artifactId>dcm4che-imageio-rle</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.dcm4che</groupId>
+      <artifactId>dcm4che-mime</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>

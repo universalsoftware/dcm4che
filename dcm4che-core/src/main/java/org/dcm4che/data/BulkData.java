@@ -38,38 +38,68 @@
 
 package org.dcm4che.data;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.text.MessageFormat;
+import java.text.ParseException;
 
 import org.dcm4che.io.DicomEncodingOptions;
 import org.dcm4che.io.DicomOutputStream;
 import org.dcm4che.util.ByteUtils;
 import org.dcm4che.util.StreamUtils;
+import org.dcm4che.util.StringUtils;
 
 /**
  * @author Gunter Zeilinger <gunterze@gmail.com>
  */
-public class BulkDataLocator implements Value {
+public class BulkData implements Value {
 
     public static final int MAGIC_LEN = 0xfbfb;
 
     public final String uri;
-    public final String transferSyntax;
+    public final String uuid;
+    private final int uriPathEnd;
+    public final boolean bigEndian;
     public final long offset;
     public final int length;
 
-    public BulkDataLocator(String uri, String transferSyntax, long offset,
-            int length) {
-        if (transferSyntax == null)
-            throw new NullPointerException("transferSyntax");
+    public BulkData(String uuid, String uri, boolean bigEndian) {
+        Object[] parsed = { uri, 0, -1 };
+        int uriPathEnd = 0;
+        if (uri != null) {
+            if (uuid != null)
+                throw new IllegalArgumentException("uuid and uri are mutually exclusive");
+            try {
+                parsed = new MessageFormat(
+                        "{0}?offset={1,number}&length={2,number}")
+                    .parse(uri);
+            } catch (ParseException e) { }
+            uriPathEnd = ((String) parsed[0]).length();
+        } else if (uuid == null) {
+            throw new IllegalArgumentException("uuid or uri must be not null");
+        }
+        this.uuid = uuid;
         this.uri = uri;
-        this.transferSyntax = transferSyntax;
+        this.uriPathEnd = uriPathEnd;
+        this.offset = ((Number) parsed[1]).longValue();
+        this.length = ((Number) parsed[2]).intValue();
+        this.bigEndian = bigEndian;
+    }
+
+    public BulkData(String uri, long offset, int length, boolean bigEndian) {
+        this.uuid = null;
+        this.uriPathEnd = uri.length();
+        this.uri = uri + "?offset=" + offset + "&length=" + length;
         this.offset = offset;
         this.length = length;
+        this.bigEndian = bigEndian;
     }
 
     @Override
@@ -79,43 +109,68 @@ public class BulkDataLocator implements Value {
 
     @Override
     public String toString() {
-        return "BulkDataLocator[uri=" +  uri 
-                + ", tsuid=" + transferSyntax
-                + ", pos=" + offset
-                + ", len=" + length + "]";
+        return "BulkData[uuid=" + uuid
+                + ", uri=" +  uri 
+                + ", bigEndian=" + bigEndian
+                + "]";
+    }
+
+    public File getFile() {
+        try {
+            return new File(new URI(uriWithoutOffsetAndLength()));
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("uri: " + uri);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("uri: " + uri);
+        }
+    }
+
+    public String uriWithoutOffsetAndLength() {
+        if (uri == null)
+            throw new IllegalStateException("uri: null");
+
+        return uri.substring(0, uriPathEnd);
     }
 
     public InputStream openStream() throws IOException {
-        try {
-            return new URI(uri).toURL().openStream();
-        } catch (URISyntaxException e) {
-            throw new AssertionError(e);
-        }
+        if (uri == null)
+            throw new IllegalStateException("uri: null");
+ 
+        if (!uri.startsWith("file:"))
+            return new URL(uri).openStream();
+
+        InputStream in = new FileInputStream(getFile());
+        StreamUtils.skipFully(in, offset);
+        return in;
+
     }
 
     @Override
     public int calcLength(DicomEncodingOptions encOpts, boolean explicitVR, VR vr) {
-        return getEncodedLength(encOpts, explicitVR, vr);
-    }
-
-    @Override
-    public int getEncodedLength(DicomEncodingOptions encOpts, boolean explicitVR, VR vr) {
+        if (length == -1)
+            throw new UnsupportedOperationException();
+ 
         return (length + 1) & ~1;
     }
 
     @Override
+    public int getEncodedLength(DicomEncodingOptions encOpts, boolean explicitVR, VR vr) {
+        return (length == -1) ? -1 : ((length + 1) & ~1);
+    }
+
+    @Override
     public byte[] toBytes(VR vr, boolean bigEndian) throws IOException {
+        if (length == -1)
+            throw new UnsupportedOperationException();
+
         if (length == 0)
             return ByteUtils.EMPTY_BYTES;
 
         InputStream in = openStream();
         try {
-            StreamUtils.skipFully(in, offset);
             byte[] b = new byte[length];
             StreamUtils.readFully(in, b, 0, b.length);
-            if (transferSyntax.equals(UID.ExplicitVRBigEndian) 
-                    ? !bigEndian
-                    : bigEndian) {
+            if (this.bigEndian != bigEndian) {
                 vr.toggleEndian(b, false);
             }
             return b;
@@ -129,10 +184,7 @@ public class BulkDataLocator implements Value {
     public void writeTo(DicomOutputStream out, VR vr) throws IOException {
         InputStream in = openStream();
         try {
-            StreamUtils.skipFully(in, offset);
-            if (transferSyntax.equals(UID.ExplicitVRBigEndian)
-                    ? !out.isBigEndian()
-                    : out.isBigEndian())
+            if (this.bigEndian != out.isBigEndian())
                 StreamUtils.copy(in, out, length, vr.numEndianBytes());
             else
                 StreamUtils.copy(in, out, length);
@@ -144,18 +196,16 @@ public class BulkDataLocator implements Value {
     }
 
     public void serializeTo(ObjectOutputStream oos) throws IOException {
-        oos.writeInt(length);
-        oos.writeLong(offset);
-        oos.writeUTF(uri);
-        oos.writeUTF(transferSyntax);
+        oos.writeUTF(StringUtils.maskNull(uuid, ""));
+        oos.writeUTF(StringUtils.maskNull(uri, ""));
+        oos.writeBoolean(bigEndian);
     }
 
     public static Value deserializeFrom(ObjectInputStream ois)
             throws IOException {
-        int len = ois.readInt();
-        long off = ois.readLong();
-        String uri = ois.readUTF();
-        String tsuid = ois.readUTF();
-        return new BulkDataLocator(uri, tsuid, off, len);
+        return new BulkData(
+            StringUtils.maskEmpty(ois.readUTF(), null),
+            StringUtils.maskEmpty(ois.readUTF(), null),
+            ois.readBoolean());
     }
 }

@@ -44,7 +44,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 
 import org.dcm4che.data.Attributes;
-import org.dcm4che.data.BulkDataLocator;
+import org.dcm4che.data.BulkData;
 import org.dcm4che.data.ElementDictionary;
 import org.dcm4che.data.Fragments;
 import org.dcm4che.data.PersonName;
@@ -76,14 +76,10 @@ public class ContentHandlerAdapter extends DefaultHandler {
     private int tag;
     private String privateCreator;
     private VR vr;
-    private String blkts;
-    private String blkuri;
-    private long blkoffset;
-    private int blklen;
-    private BulkDataLocator bulkDataLocator;
+    private BulkData bulkData;
     private Fragments dataFragments;
     private boolean processCharacters;
-    private boolean base64;
+    private boolean inlineBinary;
 
     public ContentHandlerAdapter(Attributes attrs) {
         if (attrs == null)
@@ -103,6 +99,10 @@ public class ContentHandlerAdapter extends DefaultHandler {
         case 'A':
             if (qName.equals("Alphabetic"))
                 startPNGroup(PersonName.Group.Alphabetic);
+            break;
+        case 'B':
+            if (qName.equals("BulkData"))
+                bulkData(atts.getValue("uuid"), atts.getValue("uri"));
             break;
         case 'D':
             if (qName.equals("DicomAttribute"))
@@ -124,6 +124,8 @@ public class ContentHandlerAdapter extends DefaultHandler {
         case 'I':
             if (qName.equals("Item"))
                 startItem(Integer.parseInt(atts.getValue("number")));
+            else if (qName.equals("InlineBinary"))
+                startInlineBinary();
             else if (qName.equals("Ideographic"))
                 startPNGroup(PersonName.Group.Ideographic);
             break;
@@ -160,24 +162,25 @@ public class ContentHandlerAdapter extends DefaultHandler {
         case 'V':
             if (qName.equals("Value")) {
                 startValue(Integer.parseInt(atts.getValue("number")));
-                if (this.vr.isXMLBase64())
-                    startBase64();
-                else
-                    startText();
+                startText();
             }
             break;
         }
    }
 
-    private void startBase64() {
+    private void bulkData(String uuid, String uri) {
+        bulkData = new BulkData(uuid, uri, items.getLast().bigEndian());
+    }
+
+    private void startInlineBinary() {
         processCharacters = true;
-        base64 = true;
+        inlineBinary = true;
         bout.reset();
     }
 
     private void startText() {
         processCharacters = true;
-        base64 = false;
+        inlineBinary = false;
         sb.setLength(0);
     }
 
@@ -226,7 +229,7 @@ public class ContentHandlerAdapter extends DefaultHandler {
     public void characters(char[] ch, int offset, int len)
             throws SAXException {
         if (processCharacters)
-            if (base64)
+            if (inlineBinary)
                 try {
                     if (carryLen != 0) {
                         int copy = 4 - carryLen;
@@ -251,10 +254,6 @@ public class ContentHandlerAdapter extends DefaultHandler {
     public void endElement(String uri, String localName, String qName)
             throws SAXException {
         switch (qName.charAt(0)) {
-        case 'B':
-            if (qName.equals("BulkDataLocator"))
-                endBulkDataLocator();
-            break;
         case 'D':
             if (qName.equals("DicomAttribute"))
                 endDicomAttribute();
@@ -273,10 +272,6 @@ public class ContentHandlerAdapter extends DefaultHandler {
             if (qName.equals("Item"))
                 endItem();
             break;
-        case 'L':
-            if (qName.equals("Length"))
-                blklen = Integer.parseInt(getString());
-            break;
         case 'M':
             if (qName.equals("MiddleName"))
                 endPNComponent(PersonName.Component.MiddleName);
@@ -287,23 +282,9 @@ public class ContentHandlerAdapter extends DefaultHandler {
             else if (qName.equals("NameSuffix"))
                 endPNComponent(PersonName.Component.NameSuffix);
             break;
-        case 'O':
-            if (qName.equals("Offset"))
-                blkoffset = Long.parseLong(getString());
-            break;
         case 'P':
             if (qName.equals("PersonName"))
                 endPersonName();
-            break;
-        case 'T':
-            if (qName.equals("TransferSyntax")) {
-                blkts = getString();
-            }
-            break;
-        case 'U':
-            if (qName.equals("URI")) {
-                blkuri = getString();
-            }
             break;
         case 'V':
             if (qName.equals("Value")) {
@@ -322,9 +303,9 @@ public class ContentHandlerAdapter extends DefaultHandler {
     }
 
     private void endDataFragment() {
-        if (bulkDataLocator != null) {
-            dataFragments.add(bulkDataLocator);
-            bulkDataLocator = null;
+        if (bulkData != null) {
+            dataFragments.add(bulkData);
+            bulkData = null;
         } else {
             dataFragments.add(getBytes());
         }
@@ -346,18 +327,14 @@ public class ContentHandlerAdapter extends DefaultHandler {
                 fmi = new Attributes();
             attrs = fmi;
         }
-        if (bulkDataLocator != null) {
-            attrs.setValue(privateCreator, tag, vr, bulkDataLocator);
-            bulkDataLocator = null;
-        } else if (base64) {
+        if (bulkData != null) {
+            attrs.setValue(privateCreator, tag, vr, bulkData);
+            bulkData = null;
+        } else if (inlineBinary) {
             attrs.setBytes(privateCreator, tag, vr, getBytes());
         } else {
             attrs.setString(privateCreator, tag, vr, getStrings());
         }
-    }
-
-    private void endBulkDataLocator() {
-        bulkDataLocator = new BulkDataLocator(blkuri, blkts, blkoffset, blklen);
     }
 
     private void endItem() {
@@ -371,8 +348,7 @@ public class ContentHandlerAdapter extends DefaultHandler {
     }
 
     private void endValue() {
-        if (!base64)
-            values.add(getString());
+        values.add(getString());
     }
 
     private void endPNComponent(PersonName.Component pnComp) {

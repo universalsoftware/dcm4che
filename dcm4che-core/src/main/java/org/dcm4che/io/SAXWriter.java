@@ -41,7 +41,7 @@ package org.dcm4che.io;
 import java.io.IOException;
 
 import org.dcm4che.data.Attributes;
-import org.dcm4che.data.BulkDataLocator;
+import org.dcm4che.data.BulkData;
 import org.dcm4che.data.ElementDictionary;
 import org.dcm4che.data.Fragments;
 import org.dcm4che.data.PersonName;
@@ -189,18 +189,18 @@ public class SAXWriter implements DicomInputHandler {
                 if (frag instanceof Value && ((Value) frag).isEmpty())
                     continue;
                 startElement("DataFragment", "number", number);
-                if (frag instanceof BulkDataLocator)
-                    writeBulkDataLocator((BulkDataLocator) frag);
+                if (frag instanceof BulkData)
+                    writeBulkData((BulkData) frag);
                 else {
                     byte[] b = (byte[]) frag;
                     if (bigEndian)
                         frags.vr().toggleEndian(b, true);
-                    writeValueBase64(b);
+                    writeInlineBinary(b);
                 }
                 endElement("DataFragment");
             }
-        } else if (value instanceof BulkDataLocator) {
-            writeBulkDataLocator((BulkDataLocator) value);
+        } else if (value instanceof BulkData) {
+            writeBulkData((BulkData) value);
         }
     }
 
@@ -225,9 +225,9 @@ public class SAXWriter implements DicomInputHandler {
             if (vr == VR.SQ || len == -1) {
                 dis.readValue(dis, attrs);
             } else if (len > 0) {
-                if (dis.getIncludeBulkData() ==  IncludeBulkData.LOCATOR
+                if (dis.getIncludeBulkData() ==  IncludeBulkData.URI
                         && dis.isBulkData(attrs)) {
-                    writeBulkDataLocator(dis.createBulkDataLocator());
+                    writeBulkData(dis.createBulkData());
                 } else {
                     byte[] b = dis.readValue();
                     if (tag == Tag.TransferSyntaxUID
@@ -281,14 +281,14 @@ public class SAXWriter implements DicomInputHandler {
             frags.add(ByteUtils.EMPTY_BYTES); // increment size
             if (len > 0) {
                 startElement("DataFragment", "number", frags.size());
-                if (dis.getIncludeBulkData() == IncludeBulkData.LOCATOR
+                if (dis.getIncludeBulkData() == IncludeBulkData.URI
                         && dis.isBulkDataFragment(frags)) {
-                    writeBulkDataLocator(dis.createBulkDataLocator());
+                    writeBulkData(dis.createBulkData());
                 } else {
                     byte[] b = dis.readValue();
                     if (dis.bigEndian())
                         frags.vr().toggleEndian(b, false);
-                    writeValueBase64(b);
+                    writeInlineBinary(b);
                 }
                 endElement("DataFragment");
             }
@@ -302,8 +302,8 @@ public class SAXWriter implements DicomInputHandler {
         writeElement("Value", s);
     }
 
-    public void writeValueBase64(byte[] b) throws SAXException {
-        startElement("Value", "number", "1");
+    public void writeInlineBinary(byte[] b) throws SAXException {
+        startElement("InlineBinary");
         char[] buf = buffer;
         for (int off = 0; off < b.length;) {
             int len = Math.min(b.length - off, BASE64_CHUNK_LENGTH);
@@ -311,17 +311,17 @@ public class SAXWriter implements DicomInputHandler {
             ch.characters(buf, 0, (len * 4 / 3 + 3) & ~3);
             off += len;
         }
-        endElement("Value");
+        endElement("InlineBinary");
     }
 
-    private void writeBulkDataLocator(BulkDataLocator bdl)
+    private void writeBulkData(BulkData bulkData)
             throws SAXException {
-        startElement("BulkDataLocator"); 
-        writeElement("Length", Integer.toString(bdl.length));
-        writeElement("Offset", Long.toString(bdl.offset));
-        writeElement("TransferSyntax", bdl.transferSyntax);
-        writeElement("URI", bdl.uri);
-        endElement("BulkDataLocator");
+        if (bulkData.uuid != null)
+            addAttribute("uuid", bulkData.uuid);
+        if (bulkData.uri != null)
+            addAttribute("uri", bulkData.uri);
+        startElement("BulkData");
+        endElement("BulkData");
     }
 
     private void writeElement(String qname, String s) throws SAXException {

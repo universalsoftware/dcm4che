@@ -44,16 +44,16 @@
   <artifactId>dcm4che-parent</artifactId>
   <packaging>pom</packaging>
   <name>dcm4che DICOM toolkit and utilities</name>
-  <version>3.2.0</version>
+  <version>3.2.1</version>
   <description>dcm4che DICOM toolkit and utilities</description>
   <issueManagement>
     <system>JIRA</system>
     <url>http://dcm4che.org/jira</url>
   </issueManagement>
   <scm>
-    <connection>scm:git:https://gunterze@github.com/gunterze/dcm4che.git</connection>
-    <developerConnection>scm:git:https://gunterze@github.com/gunterze/dcm4che.git</developerConnection>
-    <url>https://github.com/gunterze/dcm4che</url>
+    <connection>scm:git:git://github.com/dcm4che/dcm4che.git</connection>
+    <developerConnection>scm:git:git@github.com:dcm4che/dcm4che.git</developerConnection>
+    <url>http://github.com/dcm4che/dcm4che</url>
   </scm>
   <organization>
     <name>dcm4che.org</name>
@@ -90,15 +90,16 @@
     <module>dcm4che-image</module>
     <module>dcm4che-imageio</module>
     <module>dcm4che-imageio-rle</module>
+    <module>dcm4che-mime</module>
     <module>dcm4che-net</module>
     <module>dcm4che-net-audit</module>
     <module>dcm4che-net-hl7</module>
+    <module>dcm4che-net-imageio</module>
     <module>dcm4che-soundex</module>
     <module>dcm4che-tool</module>
     <module>dcm4che-assembly</module>
     <module>dcm4che-jboss-modules</module>
     <module>dcm4che-servlet</module>
-    <module>dcm4che-net-imageio</module>
     <module>emsowauth</module>
   </modules>
   <distributionManagement>

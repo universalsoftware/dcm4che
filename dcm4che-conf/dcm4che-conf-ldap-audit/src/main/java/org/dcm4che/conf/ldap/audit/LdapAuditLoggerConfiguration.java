@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * @author Gunter Zeilinger <gunterze@gmail.com>
- *
+ * @author Michael Backhaus <michael.backhaus@agfa.com>
  */
 public class LdapAuditLoggerConfiguration extends LdapDicomConfigurationExtension {
 
@@ -116,6 +116,8 @@ public class LdapAuditLoggerConfiguration extends LdapDicomConfigurationExtensio
         LdapUtils.storeConnRefs(attrs, logger.getConnections(), deviceDN);
         LdapUtils.storeNotNull(attrs, "dcmAuditRecordRepositoryDeviceReference",
                 config.deviceRef(logger.getAuditRecordRepositoryDeviceName()));
+        LdapUtils.storeNotDef(attrs, "dcmAuditIncludeInstanceUID", 
+                logger.isIncludeInstanceUID(), false);
         LdapUtils.storeNotNull(attrs, "dicomInstalled",
                 logger.getInstalled());
         return attrs;
@@ -184,6 +186,8 @@ public class LdapAuditLoggerConfiguration extends LdapDicomConfigurationExtensio
                 LdapUtils.booleanValue(attrs.get("dcmAuditMessageFormatXML"), false));
         logger.setTimestampInUTC(
                 LdapUtils.booleanValue(attrs.get("dcmAuditTimestampInUTC"), false));
+        logger.setIncludeInstanceUID(
+                LdapUtils.booleanValue(attrs.get("dcmAuditIncludeInstanceUID"), false));
         logger.setInstalled(
                 LdapUtils.booleanValue(attrs.get("dicomInstalled"), null));
     }
@@ -267,12 +271,23 @@ public class LdapAuditLoggerConfiguration extends LdapDicomConfigurationExtensio
                 b.getConnections(),
                 deviceDN);
         LdapUtils.storeDiff(mods, "dcmAuditRecordRepositoryDeviceReference",
-                config.deviceRef(a.getAuditRecordRepositoryDeviceName()),
-                config.deviceRef(b.getAuditRecordRepositoryDeviceName()));
+                arrDeviceRef(a),
+                arrDeviceRef(b));
+        LdapUtils.storeDiff(mods, "dcmAuditIncludeInstanceUID", 
+                a.isIncludeInstanceUID(), 
+                b.isIncludeInstanceUID(), 
+                false);
         LdapUtils.storeDiff(mods, "dicomInstalled",
                 a.getInstalled(),
                 b.getInstalled());
         return mods;
+    }
+
+    private String arrDeviceRef(AuditLogger a) {
+        Device arrDevice = a.getAuditRecordRepositoryDevice();
+        return arrDevice != null
+                ? config.deviceRef(arrDevice.getDeviceName())
+                : null;
     }
 
 }

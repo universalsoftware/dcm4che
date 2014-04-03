@@ -428,12 +428,13 @@ enum BinaryValueType implements ValueType {
 
     @Override
     public Date toDate(Object val, TimeZone tz, int valueIndex, boolean ceil,
-            Date defVal) {
+            Date defVal, DatePrecision precision) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Date[] toDate(Object val, TimeZone tz, boolean ceil) {
+    public Date[] toDate(Object val, TimeZone tz, boolean ceil,
+            DatePrecisions precisions) {
         throw new UnsupportedOperationException();
     }
 
@@ -502,7 +503,7 @@ enum BinaryValueType implements ValueType {
     } 
 
     @Override
-    public Object toValue(Date[] ds, TimeZone tz) {
+    public Object toValue(Date[] ds, TimeZone tz, DatePrecision precision) {
         throw new UnsupportedOperationException();
     }
 
@@ -532,10 +533,10 @@ enum BinaryValueType implements ValueType {
 
     @Override
     public void toXML(Object val, boolean bigEndian,
-            SpecificCharacterSet cs, SAXWriter saxWriter, boolean xmlbase64)
+            SpecificCharacterSet cs, SAXWriter saxWriter, boolean inlineBinary)
             throws SAXException {
         if (val instanceof byte[]) {
-            toXML((byte[]) val, bigEndian, saxWriter, xmlbase64);
+            toXML((byte[]) val, bigEndian, saxWriter, inlineBinary);
             return;
         }
 
@@ -543,9 +544,9 @@ enum BinaryValueType implements ValueType {
    }
 
     private void toXML(byte[] b, boolean bigEndian, SAXWriter saxWriter,
-            boolean xmlbase64) throws SAXException {
-        if (xmlbase64) {
-            saxWriter.writeValueBase64(bigEndian ? toggleEndian(b, true) : b);
+            boolean inlineBinary) throws SAXException {
+        if (inlineBinary) {
+            saxWriter.writeInlineBinary(bigEndian ? toggleEndian(b, true) : b);
         } else {
             for (int i = 0, n = b.length / numBytes, off = 0; i < n;
                     i++, off += numBytes) {
