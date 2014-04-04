@@ -1,14 +1,11 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package org.dcm4che3.tool.unvscp.data;
 
 import java.util.Collection;
 
 /**
  *
- * @author Pavel Varzinov
+ * @author Pavel Varzinov <varzinov@yandex.ru>
  */
 public class GenericWebResponse {
     private String success;

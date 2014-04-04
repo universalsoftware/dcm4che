@@ -66,6 +66,7 @@ import java.util.ResourceBundle;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.OptionBuilder;
@@ -74,14 +75,17 @@ import org.apache.commons.cli.ParseException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.PropertyConfigurator;
 import org.dcm4che3.data.Attributes;
+import org.dcm4che3.tool.unvscp.data.DicomAttribute;
 import org.dcm4che3.data.Sequence;
 import org.dcm4che3.data.Tag;
 import org.dcm4che3.data.UID;
 import org.dcm4che3.data.VR;
 import org.dcm4che3.io.DicomInputStream;
-import org.dcm4che3.io.DicomInputStream.IncludeBulkData;
 import org.dcm4che3.io.DicomOutputStream;
+import org.dcm4che3.io.DicomInputStream.IncludeBulkData;
 import org.dcm4che3.media.DicomDirWriter;
+import org.dcm4che3.tool.unvscp.media.DicomWebReader;
+import org.dcm4che3.tool.unvscp.media.IDicomReader;
 import org.dcm4che3.media.RecordFactory;
 import org.dcm4che3.media.RecordType;
 import org.dcm4che3.net.ApplicationEntity;
@@ -119,15 +123,12 @@ import org.dcm4che3.tool.common.FilesetInfo;
 import org.dcm4che3.tool.unvscp.data.CAuthWebResponse;
 import org.dcm4che3.tool.unvscp.data.CMoveWebResponse;
 import org.dcm4che3.tool.unvscp.data.CStoreWebResponse;
-import org.dcm4che3.tool.unvscp.data.DicomAttribute;
 import org.dcm4che3.tool.unvscp.data.DicomFileWebData;
 import org.dcm4che3.tool.unvscp.data.GenericWebResponse;
 import org.dcm4che3.tool.unvscp.media.DicomClientMetaInfo;
 import org.dcm4che3.tool.unvscp.media.DicomDirReaderWrapper;
 import org.dcm4che3.tool.unvscp.media.DicomDirWriterWrapper;
-import org.dcm4che3.tool.unvscp.media.DicomWebReader;
 import org.dcm4che3.tool.unvscp.media.GenericWebClient;
-import org.dcm4che3.tool.unvscp.media.IDicomReader;
 import org.dcm4che3.tool.unvscp.media.IDicomWriter;
 import org.dcm4che3.tool.unvscp.media.UnvWebClient;
 import org.dcm4che3.tool.unvscp.media.UnvWebClientListener;
@@ -143,7 +144,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author Pavel Varzinov <varzinov@yandex.ru> Alexander Sirotin <alexander.sirotin@unvsoft.com>
+ * @author Gunter Zeilinger <gunterze@gmail.com> Pavel Varzinov <varzinov@yandex.ru> Alexander Sirotin <alexander.sirotin@unvsoft.com>
  *
  */
 public class UnvSCP implements UnvWebClientListener {
@@ -190,6 +191,8 @@ public class UnvSCP implements UnvWebClientListener {
     private File tmpDir;
     private int uplSleepTime = 5;
     private Integer compressionLevel = null; // if null then compression is not used
+
+    private Thread asyncSender, dcmFileSender;
 
     private final class CStoreSCPImpl extends BasicCStoreSCP {
 
@@ -266,6 +269,9 @@ public class UnvSCP implements UnvWebClientListener {
                         LOG.warn("{}: M-WRITE-BEGIN metafile was not created due to empty Association data, UID={}", new Object[]{as, iuid});
                     }
                     file.renameTo(new File(file.getParentFile(), file.getName() + ".2.dcm"));
+                    if (UnvSCP.this.asyncSender != null && UnvSCP.this.asyncSender.isAlive()) {
+                        UnvSCP.this.asyncSender.interrupt();
+                    }
                 } else {
                     // We rename the file because it must have extension ".dcm"
                     File dcmFile = new File(file.getParentFile(), file.getName() + ".dcm");
@@ -1109,26 +1115,26 @@ public class UnvSCP implements UnvWebClientListener {
             });
 
             if (main.async) {
-                Thread asyncSender = new Thread(
+                main.asyncSender = new Thread(
                     new AsyncSenderTask(main.dicomUrl, main.emsowUsername, main.emsowPassword,
                         main.storageDir, main.tmpDir, main.badFilesDir, main.sleepTime,
                         main.notConcurrent, main.compressionLevel, main),
                     "ASYNC"
                 );
-                asyncSender.setDaemon(true);
-                asyncSender.start();
+                main.asyncSender.setDaemon(true);
+                main.asyncSender.start();
             }
 
             if (main.uplDir != null && main.uplBadFilesDir != null) {
                 Properties params = UnvWebClient.getUploadParams(main.ae, main.conn);
-                Thread dcmFileSender = new Thread(
+                main.dcmFileSender = new Thread(
                     new DcmFileSenderTask(main.dicomUrl, main.emsowUsername, main.emsowPassword,
                         main.uplDir, main.tmpDir, main.uplBadFilesDir, main.uplSleepTime,
                         main.notConcurrent, main.compressionLevel, main, params),
                     "UPL"
                 );
-                dcmFileSender.setDaemon(true);
-                dcmFileSender.start();
+                main.dcmFileSender.setDaemon(true);
+                main.dcmFileSender.start();
             }
         } catch (ParseException e) {
             System.err.println("unvscp: " + e.getMessage());

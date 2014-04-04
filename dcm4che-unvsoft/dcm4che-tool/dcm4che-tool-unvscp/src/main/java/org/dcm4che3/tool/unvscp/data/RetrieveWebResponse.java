@@ -1,7 +1,4 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package org.dcm4che3.tool.unvscp.data;
 
 import org.dcm4che3.net.service.InstanceLocator;

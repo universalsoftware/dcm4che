@@ -45,11 +45,11 @@
     <version>3.3.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.dcm4che.tool</groupId>
-  <artifactId>dcm4che-tool</artifactId>
+  <groupId>com.unvsoft.tool</groupId>
+  <artifactId>dcm4che-unvsoft-tool</artifactId>
   <packaging>pom</packaging>
-  <name>dcm4che-tool</name>
-  <description>DICOM utilities</description>
+  <name>dcm4che-unvsoft-tool</name>
+  <description>Universal Software DICOM utilities</description>
   <modules>
     <module>dcm4che-tool-unvscp</module>
   </modules>

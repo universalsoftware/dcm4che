@@ -73,6 +73,7 @@ class CGetRetrieveTask extends GenericRetrieveTask {
     protected DataWriter createDataWriter(InstanceLocator inst, String tsuid)
             throws IOException {
         Attributes attrs;
+
         DicomInputStream in = retrieveFileStreamFromWeb(inst, tsuid);
         try {
             if (withoutBulkData) {

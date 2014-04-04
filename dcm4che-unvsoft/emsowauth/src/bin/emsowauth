@@ -1,10 +1,10 @@
 #!/bin/sh
 # -------------------------------------------------------------------------
-# dcmqrscp  Launcher
+# emsowauth  Launcher
 # -------------------------------------------------------------------------
 
-MAIN_CLASS=org.dcm4che.tool.dcmqrscp.DcmQRSCP
-MAIN_JAR=dcm4che-tool-dcmqrscp-3.2.0.jar
+MAIN_CLASS=com.unvsoft.emsowauth.AuthWindow
+MAIN_JAR=emsowauth-1.0.jar
 
 DIRNAME="`dirname "$0"`"
 
@@ -37,15 +37,22 @@ else
 fi
 
 # Setup the classpath
-CP="$DCM4CHE_HOME/etc/dcmqrscp/"
-CP="$CP:$DCM4CHE_HOME/lib/$MAIN_JAR"
-CP="$CP:$DCM4CHE_HOME/lib/dcm4che-core-3.2.0.jar"
-CP="$CP:$DCM4CHE_HOME/lib/dcm4che-net-3.2.0.jar"
-CP="$CP:$DCM4CHE_HOME/lib/dcm4che-tool-common-3.2.0.jar"
-CP="$CP:$DCM4CHE_HOME/lib/slf4j-api-1.6.1.jar"
-CP="$CP:$DCM4CHE_HOME/lib/slf4j-log4j12-1.6.1.jar"
-CP="$CP:$DCM4CHE_HOME/lib/log4j-1.2.16.jar"
+CP="$DCM4CHE_HOME/lib/$MAIN_JAR"
+CP="$CP:$DCM4CHE_HOME/lib/dcm4che-core-3.3.1.jar"
+CP="$CP:$DCM4CHE_HOME/lib/dcm4che-net-3.3.1.jar"
+CP="$CP:$DCM4CHE_HOME/lib/dcm4che-tool-common-3.3.1.jar"
+CP="$CP:$DCM4CHE_HOME/lib/dcm4che-tool-unvscp-3.3.0.jar"
+CP="$CP:$DCM4CHE_HOME/lib/slf4j-api-1.7.5.jar"
+CP="$CP:$DCM4CHE_HOME/lib/slf4j-log4j12-1.7.5.jar"
+CP="$CP:$DCM4CHE_HOME/lib/log4j-1.2.17.jar"
+CP="$CP:$DCM4CHE_HOME/lib/apache-log4j-extras-1.2.17.jar"
 CP="$CP:$DCM4CHE_HOME/lib/commons-cli-1.2.jar"
+CP="$CP:$DCM4CHE_HOME/lib/httpcore-4.3.2.jar"
+CP="$CP:$DCM4CHE_HOME/lib/httpclient-4.3.2.jar"
+CP="$CP:$DCM4CHE_HOME/lib/gson-2.2.4.jar"
+CP="$CP:$DCM4CHE_HOME/lib/commons-logging-1.1.1.jar"
+CP="$CP:$DCM4CHE_HOME/lib/commons-codec-1.6.jar"
+CP="$CP:$DCM4CHE_HOME/lib/ini4j-0.5.2.jar"
 
 # For Cygwin, switch paths to Windows format before running java
 if $cygwin; then
@@ -54,4 +61,4 @@ if $cygwin; then
 fi
 
 # Execute the JVM
-exec $JAVA $JAVA_OPTS -cp "$CP" $MAIN_CLASS "$@"
+exec $JAVA $JAVA_OPTS -Xmx256m -Xms256m -XX:MaxPermSize=256m -cp "$CP" $MAIN_CLASS "$@"

@@ -14,11 +14,6 @@ import org.dcm4che3.net.service.InstanceLocator;
 import org.dcm4che3.tool.unvscp.data.GenericWebResponse;
 import org.dcm4che3.tool.unvscp.media.UnvWebClientListener;
 
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 /**
  *
  * @author Pavel Varzinov <varzinov@yandex.ru>

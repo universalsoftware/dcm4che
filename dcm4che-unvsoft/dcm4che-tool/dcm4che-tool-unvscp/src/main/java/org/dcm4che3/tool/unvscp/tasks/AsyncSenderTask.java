@@ -66,7 +66,9 @@ public class AsyncSenderTask extends GenericFilesHttpSenderTask {
                         dcmFile.getName(),
                         "Meta file was not found, dcm file will be skipped"
                     });
-            dcmFile.renameTo(new File(badFilesDir, dcmFile.getName()));
+            File badDcm = new File(badFilesDir, dcmFile.getName());
+            badDcm.setLastModified(new Date().getTime());
+            dcmFile.renameTo(badDcm);
         } else {
             LOG.info("{}+0 [{}]: FOUND-FILE {}, UID={}",
                 new String[] {
@@ -126,6 +128,9 @@ public class AsyncSenderTask extends GenericFilesHttpSenderTask {
             badDcm.delete();
             metaFile.renameTo(badMeta);
             dcmFile.renameTo(badDcm);
+            Date lastMod = new Date();
+            badMeta.setLastModified(lastMod.getTime());
+            badDcm.setLastModified(lastMod.getTime());
             LOG.error("{}+0 [{}]: BAD-FILE {}, UID={}, details: {}",
                     new String[] {
                         params.getProperty("FROM_AET", "<UNKNOWN>"),

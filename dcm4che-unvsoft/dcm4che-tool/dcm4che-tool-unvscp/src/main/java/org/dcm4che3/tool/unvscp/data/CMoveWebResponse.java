@@ -4,13 +4,12 @@
  */
 package org.dcm4che3.tool.unvscp.data;
 
-import org.dcm4che3.tool.unvscp.data.GenericWebResponse;
 import java.net.URL;
 import java.util.Collection;
 
 /**
  *
- * @author Pavel Varzinov
+ * @author Pavel Varzinov <varzinov@yandex.ru>
  */
 public class CMoveWebResponse extends GenericWebResponse {
     private URL url;

@@ -129,7 +129,7 @@ public class DcmFileSenderTask extends GenericFilesHttpSenderTask {
             dcmFile.delete();
         } catch (HttpHostConnectException hhce) { // We are saving the files here to retry sending them later
         } catch (SocketException se) {
-        } catch(Exception e) {
+        } catch (Exception e) {
             String dcmRelPath = dcmFile.getAbsolutePath().replace(queueDir.getAbsolutePath() , "");
             if (dcmRelPath.startsWith(File.separator)) {
                 dcmRelPath = dcmRelPath.substring(1);
@@ -140,6 +140,7 @@ public class DcmFileSenderTask extends GenericFilesHttpSenderTask {
                 badDcm.getParentFile().mkdirs();
             }
             dcmFile.renameTo(badDcm);
+            badDcm.setLastModified(new Date().getTime());
             LOG.error("{}+0 [{}]: BAD-FILE {}, UID={}, details: {}",
                     new String[] {
                         params.getProperty("FROM_AET", "<UNKNOWN>"),

@@ -1,7 +1,4 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package org.dcm4che3.tool.unvscp.media;
 
 import java.io.IOException;
@@ -20,7 +17,7 @@ import org.apache.http.conn.ssl.X509HostnameVerifier;
 
 /**
  *
- * @author Pavel Varzinov
+ * @author Pavel Varzinov <varzinov@yandex.ru>
  */
 public class MappedHostnamesVerifier implements X509HostnameVerifier{
     X509HostnameVerifier defaultVerifier = SSLConnectionSocketFactory.STRICT_HOSTNAME_VERIFIER;

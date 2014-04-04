@@ -95,9 +95,7 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
 
             try {
                 Thread.sleep(this.sleepTime * 1000);
-            } catch (InterruptedException ie) {
-                break;
-            }
+            } catch (InterruptedException ie) {}
         }
     }
 
