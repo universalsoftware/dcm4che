@@ -6,8 +6,8 @@ rem -------------------------------------------------------------------------
 if not "%ECHO%" == ""  echo %ECHO%
 if "%OS%" == "Windows_NT"  setlocal
 
-set MAIN_CLASS=org.dcm4che.tool.storescu.StoreSCU
-set MAIN_JAR=dcm4che-tool-storescu-3.2.1.jar
+set MAIN_CLASS=org.dcm4che3.tool.storescu.StoreSCU
+set MAIN_JAR=dcm4che-tool-storescu-3.3.0.jar
 
 set DIRNAME=.\
 if "%OS%" == "Windows_NT" set DIRNAME=%~dp0%
@@ -42,12 +42,12 @@ set JAVA=%JAVA_HOME%\bin\java
 
 set CP=%DCM4CHE_HOME%\etc\storescu\
 set CP=%CP%;%DCM4CHE_HOME%\lib\%MAIN_JAR%
-set CP=%CP%;%DCM4CHE_HOME%\lib\dcm4che-core-3.2.1.jar
-set CP=%CP%;%DCM4CHE_HOME%\lib\dcm4che-net-3.2.1.jar
-set CP=%CP%;%DCM4CHE_HOME%\lib\dcm4che-tool-common-3.2.1.jar
-set CP=%CP%;%DCM4CHE_HOME%\lib\slf4j-api-1.6.1.jar
-set CP=%CP%;%DCM4CHE_HOME%\lib\slf4j-log4j12-1.6.1.jar
-set CP=%CP%;%DCM4CHE_HOME%\lib\log4j-1.2.16.jar
+set CP=%CP%;%DCM4CHE_HOME%\lib\dcm4che-core-3.3.0.jar
+set CP=%CP%;%DCM4CHE_HOME%\lib\dcm4che-net-3.3.0.jar
+set CP=%CP%;%DCM4CHE_HOME%\lib\dcm4che-tool-common-3.3.0.jar
+set CP=%CP%;%DCM4CHE_HOME%\lib\slf4j-api-1.7.5.jar
+set CP=%CP%;%DCM4CHE_HOME%\lib\slf4j-log4j12-1.7.5.jar
+set CP=%CP%;%DCM4CHE_HOME%\lib\log4j-1.2.17.jar
 set CP=%CP%;%DCM4CHE_HOME%\lib\commons-cli-1.2.jar
 
 "%JAVA%" %JAVA_OPTS% -cp "%CP%" %MAIN_CLASS% %ARGS%

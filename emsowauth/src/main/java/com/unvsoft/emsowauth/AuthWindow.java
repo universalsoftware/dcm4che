@@ -21,10 +21,10 @@ import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.dcm4che.tool.common.CLIUtils;
-import org.dcm4che.tool.unvscp.UnvSCP;
-import org.dcm4che.tool.unvscp.data.CAuthWebResponse;
-import org.dcm4che.tool.unvscp.media.UnvWebClient;
+import org.dcm4che3.tool.common.CLIUtils;
+import org.dcm4che3.tool.unvscp.UnvSCP;
+import org.dcm4che3.tool.unvscp.data.CAuthWebResponse;
+import org.dcm4che3.tool.unvscp.media.UnvWebClient;
 import org.ini4j.Ini;
 
 /**
