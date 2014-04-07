@@ -24,7 +24,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.dcm4che.tool</groupId>
+            <groupId>com.unvsoft.tool</groupId>
             <artifactId>dcm4che-tool-unvscp</artifactId>
             <version>3.3.0</version>
             <scope>compile</scope>
