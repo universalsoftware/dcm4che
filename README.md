@@ -4,7 +4,7 @@ Sources: https://github.com/universalsoftware/dcm4che-unvsoft
 Binaries: not available  
 Issue Tracker: not available  
 
-This is a fork from [dcm4che-3.x] project (https://github.com/dcm4che/dcm4che).
+This is a fork from [dcm4che-3.x](https://github.com/dcm4che/dcm4che) project.
 
 One main focus was to reuse the major functionality adding some specific features and leaving the initial code almost untouched.
 
