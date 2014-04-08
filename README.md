@@ -1,17 +1,12 @@
-dcm4che-3.x DICOM Toolkit
+dcm4che-3.x Universal Software extended DICOM toolkit
 =========================
-Sources: https://github.com/dcm4che/dcm4che  
-Binaries: https://sourceforge.net/projects/dcm4che/files/dcm4che3  
-Issue Tracker: http://www.dcm4che.org/jira/browse/LIB  
+Sources: https://github.com/universalsoftware/dcm4che-unvsoft  
+Binaries: not available  
+Issue Tracker: not available  
 
-This is a complete rewrite of [dcm4che-2.x](http://www.dcm4che.org/confluence/display/d2/).
+This is a fork from [dcm4che-3.x] project (https://github.com/dcm4che/dcm4che).
 
-One main focus was to minimize the memory footprint of the DICOM data sets.
-It already provides modules to store/fetch configuration data to/from LDAP,
-compliant to the DICOM Application Configuration Management Profile,
-specified in [DICOM 2011, Part 15][1], Annex H.
-
-[1]: ftp://medical.nema.org/medical/dicom/2011/11_15pu.pdf
+One main focus was to reuse the major functionality adding some specific features and leaving the initial code almost untouched.
 
 Build
 -----
@@ -46,6 +41,7 @@ Modules
 - dcm4che-soundex
 - dcm4che-jboss-modules
 - dcm4che-servlet
+- dcm4che-unvsoft
 
 Utilities
 ---------
@@ -104,6 +100,14 @@ Utilities
 [xml2dcm]: https://github.com/dcm4che/dcm4che/blob/master/dcm4che-tool/dcm4che-tool-xml2dcm/README.md
 [xml2hl7]: https://github.com/dcm4che/dcm4che/blob/master/dcm4che-tool/dcm4che-tool-xml2hl7/README.md
 [xml2prefs]: https://github.com/dcm4che/dcm4che/blob/master/dcm4che-tool/dcm4che-tool-xml2prefs/README.md
+
+Universal Software extensions
+---------
+- [unvscp][]: Universal Software DICOM image archive
+- [emsowauth][]: EMSOW authentication utility
+
+[unvscp]: https://github.com/dcm4che/dcm4che/blob/master/dcm4che-unvsoft/dcm4che-tool/dcm4che-tool-unvscp/README.md
+[emsowauth]: https://github.com/dcm4che/dcm4che/blob/master/dcm4che-unvsoft/emsowauth/README.md
 
 License
 -------
