@@ -797,23 +797,12 @@ public class UnvSCP implements UnvWebClientListener {
         addSendingPendingOptions(opts);
         addRemoteConnectionsOption(opts);
         addLogOptions(opts);
-        addSslWhiteListOption(opts);
         addAsyncOptions(opts);
         addUploadDirOptions(opts);
         addCompressionOptions(opts);
         addBridgeOption(opts);
         addSessionOptions(opts);
         return CLIUtils.parseComandLine(args, opts, rb, UnvSCP.class);
-    }
-
-    @SuppressWarnings("static-access")
-    private static void addSslWhiteListOption(Options opts) {
-        opts.addOption(OptionBuilder
-                .hasOptionalArg()
-                .withArgName("ssl-whitelist")
-                .withDescription(rb.getString("ssl-whitelist"))
-                .withLongOpt("ssl-whitelist")
-                .create());
     }
 
     @SuppressWarnings("static-access")
@@ -1032,7 +1021,6 @@ public class UnvSCP implements UnvWebClientListener {
             CLIUtils.configure(main.conn, cl);
             configureDicomFileSet(main, cl);
             configureLog(main, cl);
-            configureSslWhiteList(main, cl);
             configureAsyncMode(main, cl);
             configureManualUploading(main, cl);
             configureCompression(main, cl);
@@ -1144,24 +1132,6 @@ public class UnvSCP implements UnvWebClientListener {
             System.err.println("unvscp: " + e.getMessage());
             e.printStackTrace();
             System.exit(2);
-        }
-    }
-
-    private static void configureSslWhiteList(UnvSCP main, CommandLine cl) {
-        setSslWhiteList(cl);
-    }
-
-    public static void setSslWhiteList(CommandLine cl) {
-        if (cl.hasOption("ssl-whitelist") && cl.getOptionValue("ssl-whitelist") != null) {
-            String[] whiteList = cl.getOptionValue("ssl-whitelist").split("[\\s]*(,|;|\\s)[\\s]*");
-            List<String> domains = new ArrayList<String>();
-            for (String domainName : whiteList) {
-                domains.add(domainName);
-                if (!domainName.startsWith("*.") && !domainName.matches("(?i)www\\..*")) {
-                    domains.add("*." + domainName);
-                }
-            }
-            GenericWebClient.setDomainWhiteList(domains);
         }
     }
 

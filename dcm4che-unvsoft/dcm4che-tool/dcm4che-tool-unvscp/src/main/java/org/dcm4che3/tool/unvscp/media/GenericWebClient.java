@@ -48,7 +48,6 @@ import org.slf4j.LoggerFactory;
  */
 public class GenericWebClient {
     protected static final Logger LOG = LoggerFactory.getLogger(GenericWebClient.class);
-    private static List<String> domainWhiteList;
 
     private CloseableHttpClient httpClient;
     private CookieStore basicCookieStore = new BasicCookieStore();
@@ -73,15 +72,15 @@ public class GenericWebClient {
     public GenericWebClient(String uri, Properties params) {
         this.uri = uri;
         setParams(params);
-        initConnection();
-    }
 
-    private void initConnection() {
+        /* Using of a customized host name verifier
+        List<String> domainWhiteList;
         MappedHostnamesVerifier mhv = new MappedHostnamesVerifier(GenericWebClient.domainWhiteList);
-
         SSLContext sslContext = SSLContexts.createDefault();
         SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext, mhv);
-        httpClient = HttpClients.custom().setSSLSocketFactory(csf).setDefaultCookieStore(basicCookieStore).build();
+        */
+
+        httpClient = HttpClients.custom()/*.setSSLSocketFactory(csf)*/.setDefaultCookieStore(basicCookieStore).build();
     }
 
     public void closeConnection() throws IOException {
@@ -94,10 +93,6 @@ public class GenericWebClient {
 
     public void disableConnectExceptionWrapping() {
         this.wrapConnectExceptions = false;
-    }
-
-    public static void setDomainWhiteList(List<String> domainWhiteList) {
-        GenericWebClient.domainWhiteList = domainWhiteList;
     }
 
     public void setParams(Properties params) {

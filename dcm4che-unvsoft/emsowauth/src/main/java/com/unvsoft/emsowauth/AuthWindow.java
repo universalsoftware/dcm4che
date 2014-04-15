@@ -351,7 +351,6 @@ public class AuthWindow extends javax.swing.JDialog {
             return;
         }
 
-        UnvSCP.setSslWhiteList(cl);
         UnvSCP.setEmsowSessionName(cl);
 
         /* Create and display the form */
@@ -379,12 +378,6 @@ public class AuthWindow extends javax.swing.JDialog {
                 .withDescription(rb.getString("emsow-url"))
                 .withLongOpt("emsow-url")
                 .create());
-        opts.addOption(OptionBuilder
-                .hasOptionalArg()
-                .withArgName("domain1.name[, domain2.name]")
-                .withDescription(rb.getString("ssl-whitelist"))
-                .withLongOpt("ssl-whitelist")
-                .create("w"));
         opts.addOption(OptionBuilder
                 .hasArg()
                 .withDescription(rb.getString("username"))
