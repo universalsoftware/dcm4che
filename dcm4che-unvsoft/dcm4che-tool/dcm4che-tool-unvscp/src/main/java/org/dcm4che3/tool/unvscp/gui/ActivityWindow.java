@@ -2,20 +2,43 @@
 package org.dcm4che3.tool.unvscp.gui;
 
 import java.net.URL;
+import java.util.Date;
 import javax.swing.ImageIcon;
 import javax.swing.JOptionPane;
+import javax.swing.table.TableColumnModel;
+import org.dcm4che3.tool.unvscp.tasks.SenderTaskListener;
 
 /**
  *
  * @author Pavel Varzinov <varzinov@yandex.ru>
  */
-public class ActivityWindow extends javax.swing.JFrame {
+public class ActivityWindow extends javax.swing.JFrame implements SenderTaskListener {
 
     /**
      * Creates new form ActivityWindow
      */
     public ActivityWindow() {
         initComponents();
+
+        TableColumnModel tcm = activityTable.getColumnModel();
+        if (tcm.getColumnCount() > 0) {
+            tcm.getColumn(0).setMinWidth(85);
+            tcm.getColumn(0).setMaxWidth(85);
+            tcm.getColumn(1).setMinWidth(100);
+            tcm.getColumn(1).setPreferredWidth(200);
+            tcm.getColumn(1).setMaxWidth(200);
+            tcm.getColumn(2).setMinWidth(85);
+            tcm.getColumn(2).setMaxWidth(85);
+            tcm.getColumn(3).setMinWidth(85);
+            tcm.getColumn(3).setPreferredWidth(150);
+            tcm.getColumn(3).setMaxWidth(150);
+            tcm.getColumn(4).setMinWidth(55);
+            tcm.getColumn(4).setMaxWidth(55);
+            tcm.getColumn(5).setMinWidth(100);
+            tcm.getColumn(5).setCellRenderer(new ProgressRenderer());
+            tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
+            tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
+        }
 
         /* Setting the window icon */
         URL imgUrl = getClass().getClassLoader().getResource("org/dcm4che3/tool/unvscp/icons/icon.png");
@@ -38,7 +61,6 @@ public class ActivityWindow extends javax.swing.JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("EMSOW Bridge Activity Monitor");
-        setPreferredSize(new java.awt.Dimension(500, 350));
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent evt) {
                 formWindowClosing(evt);
@@ -46,60 +68,22 @@ public class ActivityWindow extends javax.swing.JFrame {
         });
 
         activityTable.setFont(new java.awt.Font("Tahoma", 0, 14)); // NOI18N
-        activityTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {"04/21/2014", "JACILLA, LYNN", "05/23/1954", "CAROTID",  new Integer(21), "Long text"},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null}
-            },
-            new String [] {
-                "Date", "Patient name", "Date of birth", "Study", "Images", "Status"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.Object.class, java.lang.Object.class, java.lang.Object.class, java.lang.Object.class, java.lang.Integer.class, java.lang.Object.class
-            };
-            boolean[] canEdit = new boolean [] {
-                false, false, false, false, false, false
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit [columnIndex];
-            }
-        });
+        activityTable.setModel(new ActivityTableModel());
         activityTable.setRowHeight(24);
         tableScroll.setViewportView(activityTable);
-        activityTable.getColumnModel().getColumn(0).setMinWidth(85);
-        activityTable.getColumnModel().getColumn(0).setMaxWidth(85);
-        activityTable.getColumnModel().getColumn(1).setMinWidth(100);
-        activityTable.getColumnModel().getColumn(1).setPreferredWidth(200);
-        activityTable.getColumnModel().getColumn(1).setMaxWidth(200);
-        activityTable.getColumnModel().getColumn(2).setMinWidth(85);
-        activityTable.getColumnModel().getColumn(2).setMaxWidth(85);
-        activityTable.getColumnModel().getColumn(3).setMinWidth(85);
-        activityTable.getColumnModel().getColumn(3).setPreferredWidth(150);
-        activityTable.getColumnModel().getColumn(3).setMaxWidth(150);
-        activityTable.getColumnModel().getColumn(4).setMinWidth(55);
-        activityTable.getColumnModel().getColumn(4).setMaxWidth(55);
-        activityTable.getColumnModel().getColumn(5).setMinWidth(150);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 480, Short.MAX_VALUE)
+                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 560, Short.MAX_VALUE)
                 .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
                 .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 328, Short.MAX_VALUE)
                 .addContainerGap())
@@ -121,14 +105,31 @@ public class ActivityWindow extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_formWindowClosing
 
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
+    @Override
+    public void onAddNewFile(String sopInstanceUid, String studyInstanceUid,
+        Date studyDate, String studyDescription,
+        String patientName, Date patientDob) {
+
+        ((ActivityTableModel)activityTable.getModel()).insertUpdate(
+            sopInstanceUid,
+            studyInstanceUid,
+            studyDate,
+            studyDescription,
+            patientName,
+            patientDob
+        );
+    }
+
+    @Override
+    public void onProcessFile(String sopInstanceUid, String errMsg) {
+       ((ActivityTableModel)activityTable.getModel()).transferProcessUpdate(sopInstanceUid, errMsg);
+    }
+
+    public static ActivityWindow launch() {
         /* Set the Nimbus look and feel */
         //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
         /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
+         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html
          */
         try {
             for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
@@ -149,13 +150,29 @@ public class ActivityWindow extends javax.swing.JFrame {
         //</editor-fold>
 
         /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new ActivityWindow().setVisible(true);
-            }
-        });
+        ActivityWindowLauncher windowLauncher = new ActivityWindowLauncher();
+        java.awt.EventQueue.invokeLater(windowLauncher);
+        return windowLauncher.getActivityWindow();
     }
+
+    private static class ActivityWindowLauncher implements Runnable {
+        private ActivityWindow activityWindow;
+        @Override
+        public synchronized void run() {
+            activityWindow = new ActivityWindow();
+            activityWindow.setVisible(true);
+            this.notify();
+        }
+        public synchronized ActivityWindow getActivityWindow() {
+            if (activityWindow == null) {
+                try {
+                    this.wait();
+                } catch (InterruptedException ie) {}
+            }
+            return activityWindow;
+        }
+    }
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JTable activityTable;
     private javax.swing.JScrollPane tableScroll;

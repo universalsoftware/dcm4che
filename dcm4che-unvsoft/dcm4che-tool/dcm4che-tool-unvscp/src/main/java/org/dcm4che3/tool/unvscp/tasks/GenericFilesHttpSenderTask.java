@@ -8,10 +8,19 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
+import org.dcm4che3.data.Attributes;
+import org.dcm4che3.data.Tag;
+import org.dcm4che3.io.DicomInputStream;
 import org.dcm4che3.tool.unvscp.data.CStoreWebResponse;
 import org.dcm4che3.tool.unvscp.media.DicomClientMetaInfo;
 import org.dcm4che3.tool.unvscp.media.UnvWebClient;
@@ -36,8 +45,11 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
     protected Locale enUSLocale = new Locale("en", "US");
 
     private UnvWebClient webClient;
+    protected List<SenderTaskListener> senderTaskListeners = new ArrayList<SenderTaskListener>();
 
-    public abstract void sendFile(File dcmFile, Integer compressionLevel, boolean notConcurrent, UnvWebClientListener cnListener);
+    public abstract void sendFile(File dcmFile, Integer compressionLevel,
+            boolean notConcurrent, UnvWebClientListener cnListener) throws Exception;
+
     public abstract Properties getFileMeta(File dcmFile);
 
     public GenericFilesHttpSenderTask(URL emsowUrl, String emsowUsername, String emsowPassword,
@@ -75,16 +87,29 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
         while (true) {
             File[] dcmFiles = this.selectFiles(this.queueDir);
 
-            if (dcmFiles.length > 0) {
+            Map<File, String> filteredFiles = filterDcmFiles(dcmFiles);
+
+            if (filteredFiles.size() > 0) {
                 initUnvWebConnection();
-                for (File f : dcmFiles) {
+                for (Entry<File, String> fileEntry : filteredFiles.entrySet()) {
+                    File f = fileEntry.getKey();
 
                     if (isFileInUse(f)) {
                         LOG.warn("File {} is in use", f.getName());
                         continue;
                     }
 
-                    sendFile(f, compressionLevel, this.notConcurrent, this.cnListener);
+                    String errMsg = null;
+                    try {
+                        sendFile(f, compressionLevel, this.notConcurrent, this.cnListener);
+                    } catch(Exception e) {
+                        errMsg = e.toString();
+                    }
+
+                    String sopInstanceUid = fileEntry.getValue();
+                    for (SenderTaskListener stl : senderTaskListeners) {
+                        stl.onProcessFile(sopInstanceUid, errMsg);
+                    }
                 }
 
                 try {
@@ -247,4 +272,40 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
     }
 
     public void cleanUp(){}
+
+    public void addSenderTaskListener(SenderTaskListener stl) {
+        if (stl != null) {
+            senderTaskListeners.add(stl);
+        }
+    }
+
+    private Map<File, String> filterDcmFiles(File[] dcmFiles) {
+        Map<File, String> res = new HashMap<File, String>();
+        for (File f : dcmFiles) {
+            String sopInstanceUid = null, studyInstanceUid = null, studyDescription = null, patientName = null;
+            Date studyDate = null, patientDob = null;
+            try {
+                DicomInputStream dis = new DicomInputStream(f);
+                Attributes attr = dis.readDataset(-1, Tag.PixelData);
+                dis.close();
+
+                sopInstanceUid = attr.getString(Tag.SOPInstanceUID);
+                studyInstanceUid = attr.getString(Tag.StudyInstanceUID);
+                studyDate = attr.getDate(Tag.StudyDate);
+                studyDescription = attr.getString(Tag.StudyDescription);
+                patientName = attr.getString(Tag.PatientName);
+                if (patientName != null) {
+                    patientName = patientName.replaceFirst("\\^", ", ").replaceAll("\\^", " ");
+                }
+                patientDob = attr.getDate(Tag.PatientBirthDate);
+            } catch (IOException ioe) {}
+            if (sopInstanceUid != null) {
+                res.put(f, sopInstanceUid);
+                for (SenderTaskListener stl : senderTaskListeners) {
+                    stl.onAddNewFile(sopInstanceUid, studyInstanceUid, studyDate, studyDescription, patientName, patientDob);
+                }
+            }
+        }
+        return res;
+    }
 }

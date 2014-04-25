@@ -84,7 +84,8 @@ public class AsyncSenderTask extends GenericFilesHttpSenderTask {
     }
 
     @Override
-    public void sendFile(File dcmFile, Integer compressionLevel, boolean notConcurrent, UnvWebClientListener cnListener) {
+    public void sendFile(File dcmFile, Integer compressionLevel,
+        boolean notConcurrent, UnvWebClientListener cnListener) throws Exception {
 
         Properties params = this.getFileMeta(dcmFile);
         if (dcmFile == null || params == null) {
@@ -120,7 +121,9 @@ public class AsyncSenderTask extends GenericFilesHttpSenderTask {
             metaFile.delete();
             dcmFile.delete();
         } catch (HttpHostConnectException hhce) { // We are saving the files here to retry sending them later
+            throw hhce;
         } catch (SocketException se) {
+            throw se;
         } catch (Exception e) {
             File badMeta = new File(badFilesDir, metaFile.getName());
             File badDcm = new File(badFilesDir, dcmFile.getName());
@@ -139,6 +142,7 @@ public class AsyncSenderTask extends GenericFilesHttpSenderTask {
                         params.getProperty("SOP_INSTANCE_UID", ""),
                         e.toString().replaceAll("\\r", "").replaceAll("\\n", "\\\\n")
                     });
+            throw e;
         } finally {
             if (compressedFile != null) {
                 compressedFile.delete();

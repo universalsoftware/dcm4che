@@ -125,10 +125,10 @@ import org.dcm4che3.tool.unvscp.data.CMoveWebResponse;
 import org.dcm4che3.tool.unvscp.data.CStoreWebResponse;
 import org.dcm4che3.tool.unvscp.data.DicomFileWebData;
 import org.dcm4che3.tool.unvscp.data.GenericWebResponse;
+import org.dcm4che3.tool.unvscp.gui.ActivityWindow;
 import org.dcm4che3.tool.unvscp.media.DicomClientMetaInfo;
 import org.dcm4che3.tool.unvscp.media.DicomDirReaderWrapper;
 import org.dcm4che3.tool.unvscp.media.DicomDirWriterWrapper;
-import org.dcm4che3.tool.unvscp.media.GenericWebClient;
 import org.dcm4che3.tool.unvscp.media.IDicomWriter;
 import org.dcm4che3.tool.unvscp.media.UnvWebClient;
 import org.dcm4che3.tool.unvscp.media.UnvWebClientListener;
@@ -193,6 +193,8 @@ public class UnvSCP implements UnvWebClientListener {
     private Integer compressionLevel = null; // if null then compression is not used
 
     private Thread asyncSender, dcmFileSender;
+
+    private ActivityWindow activityWindow;
 
     private final class CStoreSCPImpl extends BasicCStoreSCP {
 
@@ -800,7 +802,7 @@ public class UnvSCP implements UnvWebClientListener {
         addAsyncOptions(opts);
         addUploadDirOptions(opts);
         addCompressionOptions(opts);
-        addBridgeOption(opts);
+        addBridgeOptions(opts);
         addSessionOptions(opts);
         return CLIUtils.parseComandLine(args, opts, rb, UnvSCP.class);
     }
@@ -893,13 +895,14 @@ public class UnvSCP implements UnvWebClientListener {
     }
 
     @SuppressWarnings("static-access")
-    private static void addBridgeOption(Options opts) {
+    private static void addBridgeOptions(Options opts) {
         opts.addOption(OptionBuilder
                 .hasArg()
-                .withArgName("[aet[@ip]:]port")
+                .withArgName("[aet[@ip]]")
                 .withDescription(rb.getString("destination-override"))
                 .withLongOpt("destination-override")
                 .create());
+        opts.addOption(null, "gui", false, rb.getString("visual-interface"));
     }
 
     @SuppressWarnings("static-access")
@@ -1031,6 +1034,7 @@ public class UnvSCP implements UnvWebClientListener {
             configureDestinationOverride(main, cl);
             configureSession(main, cl);
             configureRemoteConnections(main, cl);
+            configureVisualInterface(main, cl);
             ExecutorService executorService = Executors.newCachedThreadPool();
             ScheduledExecutorService scheduledExecutorService =
                     Executors.newSingleThreadScheduledExecutor();
@@ -1103,24 +1107,26 @@ public class UnvSCP implements UnvWebClientListener {
             });
 
             if (main.async) {
-                main.asyncSender = new Thread(
-                    new AsyncSenderTask(main.dicomUrl, main.emsowUsername, main.emsowPassword,
-                        main.storageDir, main.tmpDir, main.badFilesDir, main.sleepTime,
-                        main.notConcurrent, main.compressionLevel, main),
-                    "ASYNC"
+                AsyncSenderTask asyncSenderTask = new AsyncSenderTask(
+                    main.dicomUrl, main.emsowUsername, main.emsowPassword,
+                    main.storageDir, main.tmpDir, main.badFilesDir, main.sleepTime,
+                    main.notConcurrent, main.compressionLevel, main
                 );
+                asyncSenderTask.addSenderTaskListener(main.activityWindow);
+                main.asyncSender = new Thread(asyncSenderTask, "ASYNC");
                 main.asyncSender.setDaemon(true);
                 main.asyncSender.start();
             }
 
             if (main.uplDir != null && main.uplBadFilesDir != null) {
                 Properties params = UnvWebClient.getUploadParams(main.ae, main.conn);
-                main.dcmFileSender = new Thread(
-                    new DcmFileSenderTask(main.dicomUrl, main.emsowUsername, main.emsowPassword,
-                        main.uplDir, main.tmpDir, main.uplBadFilesDir, main.uplSleepTime,
-                        main.notConcurrent, main.compressionLevel, main, params),
-                    "UPL"
+                DcmFileSenderTask dcmFileSenderTask = new DcmFileSenderTask(
+                    main.dicomUrl, main.emsowUsername, main.emsowPassword,
+                    main.uplDir, main.tmpDir, main.uplBadFilesDir, main.uplSleepTime,
+                    main.notConcurrent, main.compressionLevel, main, params
                 );
+                dcmFileSenderTask.addSenderTaskListener(main.activityWindow);
+                main.dcmFileSender = new Thread(dcmFileSenderTask, "UPL");
                 main.dcmFileSender.setDaemon(true);
                 main.dcmFileSender.start();
             }
@@ -1453,13 +1459,13 @@ public class UnvSCP implements UnvWebClientListener {
     private static void configureDestinationOverride(UnvSCP main, CommandLine cl)
         throws ParseException {
 
-        if(cl.hasOption("destination-override")) {
+        if (cl.hasOption("destination-override")) {
 
-            if(cl.getOptionValue("destination-override") == null || "".equals(cl.getOptionValue("destination-override"))) {
+            if (cl.getOptionValue("destination-override") == null || "".equals(cl.getOptionValue("destination-override"))) {
                 throw new ParseException("--destination-override cannot be empty");
             }
 
-            if(!cl.hasOption("log-dir")
+            if (!cl.hasOption("log-dir")
                 || !cl.hasOption("store-log")) {
                 throw new MissingOptionException(rb.getString("missing-bridge"));
             }
@@ -1472,10 +1478,16 @@ public class UnvSCP implements UnvWebClientListener {
     }
 
     public static void setEmsowSessionName(CommandLine cl) {
-        if(!cl.hasOption("emsow-session-name") || "".equals(cl.getOptionValue("emsow-session-name").trim())) {
+        if (!cl.hasOption("emsow-session-name") || "".equals(cl.getOptionValue("emsow-session-name").trim())) {
             UnvWebClient.setSessionName("bridge");
         } else {
             UnvWebClient.setSessionName(cl.getOptionValue("emsow-session-name"));
+        }
+    }
+
+    private static void configureVisualInterface(UnvSCP main, CommandLine cl) {
+        if (cl.hasOption("gui")) {
+            main.activityWindow = ActivityWindow.launch();
         }
     }
 
