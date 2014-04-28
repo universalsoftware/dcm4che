@@ -181,7 +181,8 @@ public class UnvSCP implements UnvWebClientListener {
     private IDicomReader ddReader;
     private IDicomWriter ddWriter;
     private final Map<String, Connection> remoteConnections = Collections.synchronizedMap(new HashMap<String, Connection>());
-    private final Map<String, CAuthWebResponse.AERecord> emsowAets = Collections.synchronizedMap(new HashMap<String, CAuthWebResponse.AERecord>());
+    private final Map<String, CAuthWebResponse.AERecord> emsowClientAets = Collections.synchronizedMap(new HashMap<String, CAuthWebResponse.AERecord>());
+    private CAuthWebResponse.AERecord emsowServerAeMeta;
     private boolean isPushForUnknownEnabled, isPullForUnknownEnabled;
     private boolean allowUnknown = false;
     private boolean async = false;
@@ -271,8 +272,11 @@ public class UnvSCP implements UnvWebClientListener {
                         LOG.warn("{}: M-WRITE-BEGIN metafile was not created due to empty Association data, UID={}", new Object[]{as, iuid});
                     }
                     file.renameTo(new File(file.getParentFile(), file.getName() + ".2.dcm"));
-                    if (UnvSCP.this.asyncSender != null && UnvSCP.this.asyncSender.isAlive()) {
-                        UnvSCP.this.asyncSender.interrupt();
+                    Thread asyncSender = UnvSCP.this.asyncSender;
+                    if (asyncSender != null && asyncSender.isAlive()) {
+                        synchronized(asyncSender) {
+                            asyncSender.notify();
+                        }
                     }
                 } else {
                     // We rename the file because it must have extension ".dcm"
@@ -548,43 +552,66 @@ public class UnvSCP implements UnvWebClientListener {
         if(serviceCommand == null) {
             throw new DicomServiceException(Status.UnableToProcess, "serviceCommand cannot be empty");
         }
+        boolean isPush = serviceCommand.equalsIgnoreCase("C-STORE");
+        boolean isPull = serviceCommand.matches("^((?i)C-GET|(?i)C-MOVE|(?i)C-FIND)$");
+
         String calledAet = UnvWebClient.getCalledAetOverride(as.getCalledAET());
         String callingAet = as.getCallingAET();
         CAuthWebResponse.AERecord calledAeMeta, callingAeMeta;
         boolean isPullForUnknownEnabled, isPushForUnknownEnabled;
-        synchronized(UnvSCP.this.emsowAets) {
-            calledAeMeta = UnvSCP.this.emsowAets.get(calledAet);
-            callingAeMeta = UnvSCP.this.emsowAets.get(callingAet);
+        synchronized(UnvSCP.this.emsowClientAets) {
+            callingAeMeta = UnvSCP.this.emsowClientAets.get(callingAet);
+            calledAeMeta = UnvSCP.this.emsowServerAeMeta;
             isPullForUnknownEnabled = UnvSCP.this.isPullForUnknownEnabled;
             isPushForUnknownEnabled = UnvSCP.this.isPushForUnknownEnabled;
         }
 
-        if(calledAeMeta == null || !calledAeMeta.isServer()) {
+        /* delete?
+        if(calledAeMeta == null) {
             throw new DicomServiceException(Status.UnableToProcess, "Server AET '" + calledAet + "' is missing in PACS Clients Module");
         }
-        if(serviceCommand.equalsIgnoreCase("C-STORE") && !calledAeMeta.isPushEnabled()) {
-            throw new DicomServiceException(Status.UnableToProcess, "Pushing any data upon server with AET '" + calledAet + "' is not allowed");
+        */
+        //calledAet = calledAeMeta.getAET();
+        if (isPush && !calledAeMeta.isPushEnabled()) {
+            throw new DicomServiceException(
+                Status.UnableToProcess, "Pushing any data upon server with AET '" + calledAet + "' is not allowed"
+            );
         }
-        if(serviceCommand.matches("^((?i)C-GET|(?i)C-MOVE|(?i)C-FIND)$") && !calledAeMeta.isPullEnabled()) {
-            throw new DicomServiceException(Status.UnableToProcess, "Pulling any data from server with AET '" + calledAet + "' is not allowed");
+        if (isPull && !calledAeMeta.isPullEnabled()) {
+            throw new DicomServiceException(
+                Status.UnableToProcess, "Pulling any data from server with AET '" + calledAet + "' is not allowed"
+            );
         }
 
-        if(calledAeMeta.isUnknownAllowed() && (callingAeMeta == null || callingAeMeta.isServer())) {
-            if(serviceCommand.equalsIgnoreCase("C-STORE") && !isPushForUnknownEnabled) {
-                throw new DicomServiceException(Status.UnableToProcess, "Pushing any data from unknown clients is not allowed");
+        if (callingAeMeta == null) {
+            if (!calledAeMeta.isUnknownAllowed()) {
+                throw new DicomServiceException(
+                    Status.UnableToProcess, "Client AET '" + callingAet + "' is missing in PACS Clients Module"
+                );
             }
-            if(serviceCommand.matches("^((?i)C-GET|(?i)C-MOVE|(?i)C-FIND)$") && !isPullForUnknownEnabled) {
-                throw new DicomServiceException(Status.UnableToProcess, "Pulling any data onto unknown clients is not allowed");
+            if (isPush && !isPushForUnknownEnabled) {
+                throw new DicomServiceException(
+                    Status.UnableToProcess, "Pushing any data from unknown clients is not allowed"
+                );
+            }
+            if (isPull && !isPullForUnknownEnabled) {
+                throw new DicomServiceException(
+                    Status.UnableToProcess, "Pulling any data onto unknown clients is not allowed"
+                );
             }
         } else {
-            if(callingAeMeta == null || callingAeMeta.isServer()) {
-                throw new DicomServiceException(Status.UnableToProcess, "Client AET '" + callingAet + "' is missing in PACS Clients Module");
+            List<String> AllowedClients = calledAeMeta.getClients();
+            boolean isClientAllowed = calledAeMeta.isUnknownAllowed()
+                || AllowedClients == null || AllowedClients.contains(callingAeMeta.getAET());
+            if (isPush && !(callingAeMeta.isPushEnabled() && isClientAllowed)) {
+                throw new DicomServiceException(
+                    Status.UnableToProcess, "Pushing any data from client with AET '" + callingAet + "' is not allowed"
+                );
             }
-            if(serviceCommand.equalsIgnoreCase("C-STORE") && !callingAeMeta.isPushEnabled()) {
-                throw new DicomServiceException(Status.UnableToProcess, "Pushing any data from client with AET '" + callingAet + "' is not allowed");
-            }
-            if(serviceCommand.matches("^((?i)C-GET|(?i)C-MOVE|(?i)C-FIND)$") && !callingAeMeta.isPullEnabled()) {
-                throw new DicomServiceException(Status.UnableToProcess, "Pulling any data onto client with AET '" + callingAet + "' is not allowed");
+            if (isPull && !(callingAeMeta.isPullEnabled() && isClientAllowed)) {
+                throw new DicomServiceException(
+                    Status.UnableToProcess, "Pulling any data onto client with AET '" + callingAet + "' is not allowed"
+                );
             }
         }
     }
@@ -1067,25 +1094,24 @@ public class UnvSCP implements UnvWebClientListener {
                         }
 
                         CAuthWebResponse cawr = webClient.parseJsonResponse(CAuthWebResponse.class);
-                        Collection<CAuthWebResponse.AERecord> aelist = cawr.getData();
-                        if(aelist != null) {
-                            synchronized(main.emsowAets) {
+                        Collection<CAuthWebResponse.AERecord> ae_client_list = cawr.getClientsData();
+                        if (ae_client_list != null) {
+                            synchronized(main.emsowClientAets) {
                                 main.isPullForUnknownEnabled = cawr.isPullForUnknownEnabled();
                                 main.isPushForUnknownEnabled = cawr.isPushForUnknownEnabled();
-                                main.emsowAets.clear();
-                                for(CAuthWebResponse.AERecord aerec : aelist) {
-                                    main.emsowAets.put(aerec.getAET(), aerec);
+                                main.emsowServerAeMeta = cawr.getServerData();
+                                main.emsowClientAets.clear();
+                                for (CAuthWebResponse.AERecord aerec : ae_client_list) {
+                                    main.emsowClientAets.put(aerec.getAET(), aerec);
                                 }
                             }
                             if(UnvSCP.isDynamicAEList) {
                                 synchronized(main.remoteConnections) {
                                     main.remoteConnections.clear();
-                                    for(CAuthWebResponse.AERecord aerec : aelist) {
-                                        if(!aerec.isServer()) {
-                                            String host = (aerec.getHost() == null) ? "" : aerec.getHost();
-                                            String port = (aerec.getHost() == null || "".equals(aerec.getPort().trim())) ? "104" : aerec.getPort();
-                                            main.addRemoteConnection(aerec.getAET(), UnvSCP.createAllowedConnection(host + ":" + port));
-                                        }
+                                    for (CAuthWebResponse.AERecord aerec : ae_client_list) {
+                                        String host = (aerec.getHost() == null) ? "" : aerec.getHost();
+                                        String port = (aerec.getHost() == null || "".equals(aerec.getPort().trim())) ? "104" : aerec.getPort();
+                                        main.addRemoteConnection(aerec.getAET(), UnvSCP.createAllowedConnection(host + ":" + port));
                                     }
                                 }
                             }

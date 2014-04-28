@@ -85,6 +85,10 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
                 });
 
         while (true) {
+            for (SenderTaskListener stl : senderTaskListeners) {
+                stl.doStudySummary();
+            }
+
             File[] dcmFiles = this.selectFiles(this.queueDir);
 
             Map<File, String> filteredFiles = filterDcmFiles(dcmFiles);
@@ -119,7 +123,9 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
             }
 
             try {
-                Thread.sleep(this.sleepTime * 1000);
+                synchronized(this) {
+                    this.wait(this.sleepTime * 1000);
+                }
             } catch (InterruptedException ie) {}
         }
     }

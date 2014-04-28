@@ -23,9 +23,11 @@ public class CAuthWebResponse extends GenericWebResponse {
         public String getAET() { return this.pacsae_title; }
         public String getHost() { return this.pacsae_host; }
         public String getPort() { return this.pacsae_port; }
+        /*
         public boolean isServer() {
-            return (pacsae_type != null && pacsae_type.matches("^(?i)server$"));
+            return pacsae_type != "server";
         }
+        */
         public boolean isPullEnabled() {
             return CAuthWebResponse.parseBoolean(pacsae_pull);
         }
@@ -40,20 +42,28 @@ public class CAuthWebResponse extends GenericWebResponse {
         }
     };
 
-    private Collection<AERecord> aelist;
-    private String pacsae_pull_for_unknown;
-    private String pacsae_push_for_unknown;
+    private Collection<AERecord> client_ae_list;
+    private AERecord server_ae;
+    private String pull_for_unknown;
+    private String push_for_unknown;
 
-    @Override
-    public Collection<AERecord> getData() {
-        return this.aelist;
+    public Collection<AERecord> getClientsData() {
+        return this.client_ae_list;
+    }
+
+    public AERecord getServerData() {
+        return this.server_ae;
+    }
+
+    public boolean isUnknownEnabled() {
+        return this.server_ae.isUnknownAllowed();
     }
 
     public boolean isPullForUnknownEnabled() {
-        return this.parseBoolean(pacsae_pull_for_unknown);
+        return this.parseBoolean(pull_for_unknown);
     }
 
     public boolean isPushForUnknownEnabled() {
-        return this.parseBoolean(pacsae_push_for_unknown);
+        return this.parseBoolean(push_for_unknown);
     }
 }

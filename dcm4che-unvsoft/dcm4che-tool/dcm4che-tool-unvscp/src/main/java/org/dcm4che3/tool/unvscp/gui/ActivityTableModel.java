@@ -12,10 +12,10 @@ import javax.swing.table.DefaultTableModel;
  */
 public class ActivityTableModel extends DefaultTableModel {
     private static final String[] columnNames = {
-        "Date", "Patient name", "Date of birth", "Study", "Images", "Status", "Study UID", "SOP Instance UIDs"
+        "Date", "Patient name", "Date of birth", "Study", "Images", "Status", "Study UID", "SOP Instance UIDs", "Show Summary"
     };
     private static final Class[] columnClasses = {
-        Date.class, String.class, Date.class, String.class, Integer.class, Object.class, String.class, Map.class
+        Date.class, String.class, Date.class, String.class, Integer.class, Object.class, String.class, Map.class, Boolean.class
     };
 
     public ActivityTableModel() {
@@ -54,12 +54,13 @@ public class ActivityTableModel extends DefaultTableModel {
             }
             /* Column 5 is used to render the progress */
             /* Column 6 is not updated cause it contains the same studyInstanceUid */
+            setValueAt(false, rowToUpdate, 8);
             this.fireTableRowsUpdated(rowToUpdate, rowToUpdate);
         } else {
             sopInstanceUidMap = new HashMap<String, Object[]>();
             sopInstanceUidMap.put(sopInstanceUid, new Object[]{false, ""}); // File status and status text
             Object[] record = new Object[]{
-                studyDate, patientName, patientDob, studyDescription, 1, null, studyInstanceUid, sopInstanceUidMap
+                studyDate, patientName, patientDob, studyDescription, 1, null, studyInstanceUid, sopInstanceUidMap, false
             };
             addRow(record);
         }
@@ -98,6 +99,10 @@ public class ActivityTableModel extends DefaultTableModel {
         return resultRow;
     }
 
+    public synchronized int getTotalNumberOfFiles(int rowIndex) {
+        return (Integer)getValueAt(rowIndex, 4);
+    }
+
     public synchronized int getNumberOfSentFiles(int rowIndex) {
         int res = 0;
 
@@ -108,7 +113,18 @@ public class ActivityTableModel extends DefaultTableModel {
         return res;
     }
 
-    public synchronized int getTotalNumberOfFiles(int rowIndex) {
-        return (Integer)getValueAt(rowIndex, 4);
+    public synchronized int getNumberOfBadFiles(int rowIndex) {
+        return getTotalNumberOfFiles(rowIndex) - getNumberOfSentFiles(rowIndex);
+    }
+
+    public synchronized void showSummary() {
+        for (int row = 0; row < getRowCount(); row++) {
+            setValueAt(true, row, 8);
+            this.fireTableRowsUpdated(row, row);
+        }
+    }
+
+    public synchronized boolean getShowSummary(int rowIndex) {
+        return (Boolean)getValueAt(rowIndex, 8);
     }
 }

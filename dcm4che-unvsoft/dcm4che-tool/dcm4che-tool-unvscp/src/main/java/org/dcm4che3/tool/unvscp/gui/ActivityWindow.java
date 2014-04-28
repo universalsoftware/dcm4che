@@ -34,8 +34,10 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
             tcm.getColumn(3).setMaxWidth(150);
             tcm.getColumn(4).setMinWidth(55);
             tcm.getColumn(4).setMaxWidth(55);
+            tcm.getColumn(4).setCellRenderer(new IconCellRenderer());
             tcm.getColumn(5).setMinWidth(100);
-            tcm.getColumn(5).setCellRenderer(new ProgressRenderer());
+            tcm.getColumn(5).setCellRenderer(new ProgressCellRenderer());
+            tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
         }
@@ -123,6 +125,11 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
     @Override
     public void onProcessFile(String sopInstanceUid, String errMsg) {
        ((ActivityTableModel)activityTable.getModel()).transferProcessUpdate(sopInstanceUid, errMsg);
+    }
+
+    @Override
+    public void doStudySummary() {
+        ((ActivityTableModel)activityTable.getModel()).showSummary();
     }
 
     public static ActivityWindow launch() {
