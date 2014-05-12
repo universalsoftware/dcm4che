@@ -166,14 +166,14 @@ public class DcmFileSenderTask extends GenericFilesHttpSenderTask {
     }
 
     private void removeChildDirsRecursive(File dir) {
-        if(!dir.equals(queueDir)) {
-            dir.delete();
-        }
         File[] children = dir.listFiles();
         for (File f : children) {
             if (f.isDirectory()) {
                 removeChildDirsRecursive(f);
             }
+        }
+       if(!dir.equals(queueDir)) {
+            dir.delete();
         }
     }
 }

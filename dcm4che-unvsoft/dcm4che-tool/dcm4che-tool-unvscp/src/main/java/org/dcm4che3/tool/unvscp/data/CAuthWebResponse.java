@@ -11,15 +11,17 @@ import java.util.List;
  */
 public class CAuthWebResponse extends GenericWebResponse {
     public final class AERecord {
+        private String pacsae_id;
         private String pacsae_title;
         private String pacsae_host;
         private String pacsae_port;
         private String pacsae_type; // [client|server] client by default
         private String pacsae_pull;
         private String pacsae_push;
-        private String pacsae_routes; // a string containing aets devided by comas
+        private String pacsae_clients; // a string containing IDs divided by commas
         private String pacsae_allow_unknown;
 
+        public String getID() { return this.pacsae_id; }
         public String getAET() { return this.pacsae_title; }
         public String getHost() { return this.pacsae_host; }
         public String getPort() { return this.pacsae_port; }
@@ -35,24 +37,24 @@ public class CAuthWebResponse extends GenericWebResponse {
             return CAuthWebResponse.parseBoolean(pacsae_push);
         }
         public List<String> getClients() {
-            return (pacsae_routes == null || "".equals(pacsae_routes.trim())) ? null : Arrays.asList(pacsae_routes.split(","));
+            return (pacsae_clients == null || "".equals(pacsae_clients)) ? null : Arrays.asList(pacsae_clients.split(","));
         }
         public boolean isUnknownAllowed() {
             return CAuthWebResponse.parseBoolean(pacsae_allow_unknown);
         }
     };
 
-    private Collection<AERecord> client_ae_list;
     private AERecord server_ae;
+    private Collection<AERecord> client_ae_list;
     private String pull_for_unknown;
     private String push_for_unknown;
 
-    public Collection<AERecord> getClientsData() {
-        return this.client_ae_list;
-    }
-
     public AERecord getServerData() {
         return this.server_ae;
+    }
+
+    public Collection<AERecord> getClientsData() {
+        return this.client_ae_list;
     }
 
     public boolean isUnknownEnabled() {

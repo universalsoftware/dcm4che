@@ -22,21 +22,31 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
 
         TableColumnModel tcm = activityTable.getColumnModel();
         if (tcm.getColumnCount() > 0) {
-            tcm.getColumn(0).setMinWidth(85);
-            tcm.getColumn(0).setMaxWidth(85);
-            tcm.getColumn(1).setMinWidth(100);
-            tcm.getColumn(1).setPreferredWidth(200);
-            tcm.getColumn(1).setMaxWidth(200);
-            tcm.getColumn(2).setMinWidth(85);
-            tcm.getColumn(2).setMaxWidth(85);
+            tcm.getColumn(0).setMinWidth(70);
+            tcm.getColumn(0).setPreferredWidth(70);
+            tcm.getColumn(0).setMaxWidth(100);
+            tcm.getColumn(0).setCellRenderer(new DateCellRenderer());
+            tcm.getColumn(1).setMinWidth(150);
+            tcm.getColumn(1).setPreferredWidth(250);
+            tcm.getColumn(1).setMaxWidth(250);
+            tcm.getColumn(2).setMinWidth(70);
+            tcm.getColumn(2).setPreferredWidth(70);
+            tcm.getColumn(2).setMaxWidth(100);
+            tcm.getColumn(2).setCellRenderer(new DateCellRenderer());
             tcm.getColumn(3).setMinWidth(85);
             tcm.getColumn(3).setPreferredWidth(150);
-            tcm.getColumn(3).setMaxWidth(150);
+            tcm.getColumn(3).setMaxWidth(200);
             tcm.getColumn(4).setMinWidth(55);
-            tcm.getColumn(4).setMaxWidth(55);
-            tcm.getColumn(4).setCellRenderer(new IconCellRenderer());
-            tcm.getColumn(5).setMinWidth(100);
-            tcm.getColumn(5).setCellRenderer(new ProgressCellRenderer());
+            tcm.getColumn(4).setPreferredWidth(70);
+            tcm.getColumn(4).setMaxWidth(75);
+            tcm.getColumn(4).setCellRenderer(new ImagesCellRenderer());
+            tcm.getColumn(5).setMinWidth(80);
+            tcm.getColumn(5).setMaxWidth(80);
+            tcm.getColumn(5).setCellRenderer(new StatusCellRenderer());
+            tcm.getColumn(6).setMinWidth(100);
+            tcm.getColumn(6).setPreferredWidth(300);
+            tcm.getColumn(6).setCellRenderer(new ProgressCellRenderer());
+            tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
@@ -62,7 +72,7 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
         activityTable = new javax.swing.JTable();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
-        setTitle("EMSOW Bridge Activity Monitor");
+        setTitle("EMSOW Bridge");
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent evt) {
                 formWindowClosing(evt);
@@ -80,14 +90,14 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 560, Short.MAX_VALUE)
+                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 620, Short.MAX_VALUE)
                 .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 328, Short.MAX_VALUE)
+                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 458, Short.MAX_VALUE)
                 .addContainerGap())
         );
 
@@ -96,13 +106,17 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
     }// </editor-fold>//GEN-END:initComponents
 
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
-        int res = JOptionPane.showConfirmDialog(
-            this,
-            "Are you sure you want to quit?",
-            "Confirmation",
-            JOptionPane.YES_NO_OPTION
-        );
-        if (res == JOptionPane.YES_OPTION) {
+        if (((ActivityTableModel)activityTable.getModel()).isSendingInProgress()) {
+            int res = JOptionPane.showConfirmDialog(
+                this,
+                "Some tasks are in progress.\nAre you sure you want to quit?",
+                "Confirmation",
+                JOptionPane.YES_NO_OPTION
+            );
+            if (res == JOptionPane.YES_OPTION) {
+                setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+            }
+        } else {
             setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         }
     }//GEN-LAST:event_formWindowClosing
@@ -123,12 +137,17 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
     }
 
     @Override
-    public void onProcessFile(String sopInstanceUid, String errMsg) {
+    public void onStartProcessingFile(String sopInstanceUid) {
+        ((ActivityTableModel)activityTable.getModel()).markGroupAsProcessed(sopInstanceUid);
+    }
+
+    @Override
+    public void onFinishProcessingFile(String sopInstanceUid, String errMsg) {
        ((ActivityTableModel)activityTable.getModel()).transferProcessUpdate(sopInstanceUid, errMsg);
     }
 
     @Override
-    public void doStudySummary() {
+    public void onFinishProcessingBatch() {
         ((ActivityTableModel)activityTable.getModel()).showSummary();
     }
 

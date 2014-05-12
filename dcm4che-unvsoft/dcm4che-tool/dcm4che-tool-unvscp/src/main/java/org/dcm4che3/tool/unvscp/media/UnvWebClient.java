@@ -50,7 +50,7 @@ public class UnvWebClient extends GenericWebClient {
             p.setProperty("TO_HOST",        getOverride(as.getSocket().getLocalAddress().getHostAddress(), UnvWebClient.hostOverride));
             p.setProperty("TO_HOST_NAME",   getOverride(as.getSocket().getLocalAddress().getHostName(), UnvWebClient.hostNameOverride));
             //p.setProperty("TO_PORT",        getOverride(as.getSocket().getLocalPort() + "", UnvWebClient.portOverride + ""));
-            p.setProperty("TO_AET",         getOverride(as.getCalledAET(), UnvWebClient.aetOverride));
+            p.setProperty("TO_AET",         "".equals(UnvWebClient.aetOverride) ? "" : getOverride(as.getCalledAET(), UnvWebClient.aetOverride));
             return p;
         } else {
             return null;
@@ -67,7 +67,7 @@ public class UnvWebClient extends GenericWebClient {
             p.setProperty("TO_HOST",        getOverride(conn.getServer().getInetAddress().getHostAddress(), UnvWebClient.hostOverride));
             p.setProperty("TO_HOST_NAME",   getOverride(conn.getServer().getInetAddress().getHostName(), UnvWebClient.hostNameOverride));
             //p.setProperty("TO_PORT",        getOverride(conn.getServer().getLocalPort() + "", UnvWebClient.portOverride + ""));
-            p.setProperty("TO_AET",         getOverride(ae.getAETitle(), UnvWebClient.aetOverride));
+            p.setProperty("TO_AET",         "".equals(UnvWebClient.aetOverride) ? "" : getOverride(ae.getAETitle(), UnvWebClient.aetOverride));
             return p;
         } else {
             return null;
@@ -75,7 +75,7 @@ public class UnvWebClient extends GenericWebClient {
     }
 
     public static String getCalledAetOverride(String aeTitle) {
-        return getOverride(aeTitle, UnvWebClient.aetOverride);
+        return "".equals(UnvWebClient.aetOverride) ? "<DEFAULT>" : getOverride(aeTitle, UnvWebClient.aetOverride);
     }
 
     public static String getCallingAetOverride(String aeTitle) {
@@ -161,12 +161,14 @@ public class UnvWebClient extends GenericWebClient {
     }
 
     public static void setDestinationOverride(String destinationOverride) {
-        String[] overridenValues = UnvWebClient.setOverride(destinationOverride + ":104");
+        String[] overridenValues = UnvWebClient.setOverride(destinationOverride);
         UnvWebClient.aetOverride = overridenValues[0];
         UnvWebClient.hostOverride = overridenValues[1];
         UnvWebClient.hostNameOverride = overridenValues[2];
+        /* Port has been cut off due Story #8784
         try {
             UnvWebClient.portOverride = Integer.parseInt(overridenValues[3]);
         } catch(Exception e) {}
+        */
     }
 }

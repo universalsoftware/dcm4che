@@ -10,18 +10,15 @@ import java.io.RandomAccessFile;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
-import org.dcm4che3.data.Attributes;
-import org.dcm4che3.data.Tag;
-import org.dcm4che3.io.DicomInputStream;
 import org.dcm4che3.tool.unvscp.data.CStoreWebResponse;
+import org.dcm4che3.tool.unvscp.data.DicomFileDataPresentation;
 import org.dcm4che3.tool.unvscp.media.DicomClientMetaInfo;
 import org.dcm4che3.tool.unvscp.media.UnvWebClient;
 import org.dcm4che3.tool.unvscp.media.UnvWebClientListener;
@@ -85,10 +82,6 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
                 });
 
         while (true) {
-            for (SenderTaskListener stl : senderTaskListeners) {
-                stl.doStudySummary();
-            }
-
             File[] dcmFiles = this.selectFiles(this.queueDir);
 
             Map<File, String> filteredFiles = filterDcmFiles(dcmFiles);
@@ -97,6 +90,11 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
                 initUnvWebConnection();
                 for (Entry<File, String> fileEntry : filteredFiles.entrySet()) {
                     File f = fileEntry.getKey();
+                    String sopInstanceUid = fileEntry.getValue();
+
+                    for (SenderTaskListener stl : senderTaskListeners) {
+                        stl.onStartProcessingFile(sopInstanceUid);
+                    }
 
                     if (isFileInUse(f)) {
                         LOG.warn("File {} is in use", f.getName());
@@ -110,9 +108,8 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
                         errMsg = e.toString();
                     }
 
-                    String sopInstanceUid = fileEntry.getValue();
                     for (SenderTaskListener stl : senderTaskListeners) {
-                        stl.onProcessFile(sopInstanceUid, errMsg);
+                        stl.onFinishProcessingFile(sopInstanceUid, errMsg);
                     }
                 }
 
@@ -120,6 +117,12 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
                     closeUnvWebConnection();
                     cleanUp();
                 } catch(Exception ignore) {}
+            }
+
+            if (filteredFiles.isEmpty()) {
+                for (SenderTaskListener stl : senderTaskListeners) {
+                    stl.onFinishProcessingBatch();
+                }
             }
 
             try {
@@ -286,31 +289,22 @@ public abstract class GenericFilesHttpSenderTask implements Runnable {
     }
 
     private Map<File, String> filterDcmFiles(File[] dcmFiles) {
-        Map<File, String> res = new HashMap<File, String>();
+        Map<File, String> res = new LinkedHashMap<File, String>();
         for (File f : dcmFiles) {
-            String sopInstanceUid = null, studyInstanceUid = null, studyDescription = null, patientName = null;
-            Date studyDate = null, patientDob = null;
             try {
-                DicomInputStream dis = new DicomInputStream(f);
-                Attributes attr = dis.readDataset(-1, Tag.PixelData);
-                dis.close();
-
-                sopInstanceUid = attr.getString(Tag.SOPInstanceUID);
-                studyInstanceUid = attr.getString(Tag.StudyInstanceUID);
-                studyDate = attr.getDate(Tag.StudyDate);
-                studyDescription = attr.getString(Tag.StudyDescription);
-                patientName = attr.getString(Tag.PatientName);
-                if (patientName != null) {
-                    patientName = patientName.replaceFirst("\\^", ", ").replaceAll("\\^", " ");
-                }
-                patientDob = attr.getDate(Tag.PatientBirthDate);
-            } catch (IOException ioe) {}
-            if (sopInstanceUid != null) {
-                res.put(f, sopInstanceUid);
+                DicomFileDataPresentation dfdp = new DicomFileDataPresentation(f);
+                res.put(f, dfdp.getSopInstanceUid());
                 for (SenderTaskListener stl : senderTaskListeners) {
-                    stl.onAddNewFile(sopInstanceUid, studyInstanceUid, studyDate, studyDescription, patientName, patientDob);
+                    stl.onAddNewFile(
+                        dfdp.getSopInstanceUid(),
+                        dfdp.getStudyInstanceUid(),
+                        dfdp.getStudyDate(),
+                        dfdp.getStudyDescription(),
+                        dfdp.getPatientName(),
+                        dfdp.getPatientBirthDate()
+                    );
                 }
-            }
+            } catch (IOException ioe) {}
         }
         return res;
     }

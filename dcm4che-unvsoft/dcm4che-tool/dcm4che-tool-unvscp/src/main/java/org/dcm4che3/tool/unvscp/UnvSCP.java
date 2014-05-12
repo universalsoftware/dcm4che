@@ -123,6 +123,7 @@ import org.dcm4che3.tool.common.FilesetInfo;
 import org.dcm4che3.tool.unvscp.data.CAuthWebResponse;
 import org.dcm4che3.tool.unvscp.data.CMoveWebResponse;
 import org.dcm4che3.tool.unvscp.data.CStoreWebResponse;
+import org.dcm4che3.tool.unvscp.data.DicomFileDataPresentation;
 import org.dcm4che3.tool.unvscp.data.DicomFileWebData;
 import org.dcm4che3.tool.unvscp.data.GenericWebResponse;
 import org.dcm4che3.tool.unvscp.gui.ActivityWindow;
@@ -181,8 +182,8 @@ public class UnvSCP implements UnvWebClientListener {
     private IDicomReader ddReader;
     private IDicomWriter ddWriter;
     private final Map<String, Connection> remoteConnections = Collections.synchronizedMap(new HashMap<String, Connection>());
-    private final Map<String, CAuthWebResponse.AERecord> emsowClientAets = Collections.synchronizedMap(new HashMap<String, CAuthWebResponse.AERecord>());
     private CAuthWebResponse.AERecord emsowServerAeMeta;
+    private final Map<String, CAuthWebResponse.AERecord> emsowClientAets = Collections.synchronizedMap(new HashMap<String, CAuthWebResponse.AERecord>());
     private boolean isPushForUnknownEnabled, isPullForUnknownEnabled;
     private boolean allowUnknown = false;
     private boolean async = false;
@@ -237,6 +238,31 @@ public class UnvSCP implements UnvWebClientListener {
             super("*");
         }
 
+        private void onAddNewFile(DicomFileDataPresentation dfdp) {
+            if (activityWindow != null && dfdp != null) {
+                activityWindow.onAddNewFile(
+                    dfdp.getSopInstanceUid(),
+                    dfdp.getStudyInstanceUid(),
+                    dfdp.getStudyDate(),
+                    dfdp.getStudyDescription(),
+                    dfdp.getPatientName(),
+                    dfdp.getPatientBirthDate()
+                );
+            }
+        }
+
+        private void onStartProcessingFile(DicomFileDataPresentation dfdp){
+            if (activityWindow != null && dfdp != null) {
+                activityWindow.onStartProcessingFile(dfdp.getSopInstanceUid());
+            }
+        }
+
+        private void onFinishProcessingFile(DicomFileDataPresentation dfdp, String errMsg) {
+            if (activityWindow != null && dfdp != null) {
+                activityWindow.onFinishProcessingFile(dfdp.getSopInstanceUid(), errMsg);
+            }
+        }
+
         @Override
         protected void store(Association as, PresentationContext pc, Attributes rq,
             PDVInputStream data, Attributes rsp) throws IOException {
@@ -260,6 +286,13 @@ public class UnvSCP implements UnvWebClientListener {
             File metaFile = null;
             try {
                 storeTo(as, fmi, data, file, iuid);
+
+                DicomFileDataPresentation dicomFileData = null;
+                try {
+                    dicomFileData = new DicomFileDataPresentation(file);
+                } catch (IOException ioe) {}
+                onAddNewFile(dicomFileData);
+
                 if(UnvSCP.this.async) {
                     Properties metaData = UnvWebClient.getAssocParams(as);
                     if (metaData != null) {
@@ -279,12 +312,19 @@ public class UnvSCP implements UnvWebClientListener {
                         }
                     }
                 } else {
-                    // We rename the file because it must have extension ".dcm"
-                    File dcmFile = new File(file.getParentFile(), file.getName() + ".dcm");
-                    if (file.renameTo(dcmFile)) {
-                        file = dcmFile;
+                    onStartProcessingFile(dicomFileData);
+                    try {
+                        // We rename the file because it must have extension ".dcm"
+                        File dcmFile = new File(file.getParentFile(), file.getName() + ".dcm");
+                        if (file.renameTo(dcmFile)) {
+                            file = dcmFile;
+                        }
+                        this.doWebCStore(as, serviceCommand, iuid, file);
+                        onFinishProcessingFile(dicomFileData, null);
+                    } catch(IOException ioe) {
+                        onFinishProcessingFile(dicomFileData, ioe.getMessage());
+                        throw ioe;
                     }
-                    this.doWebCStore(as, serviceCommand, iuid, file);
                 }
             } catch(Exception e) {
                 try { fos.close(); } catch(Exception ignore) {}
@@ -555,23 +595,24 @@ public class UnvSCP implements UnvWebClientListener {
         boolean isPush = serviceCommand.equalsIgnoreCase("C-STORE");
         boolean isPull = serviceCommand.matches("^((?i)C-GET|(?i)C-MOVE|(?i)C-FIND)$");
 
-        String calledAet = UnvWebClient.getCalledAetOverride(as.getCalledAET());
+        String calledAet;
         String callingAet = as.getCallingAET();
         CAuthWebResponse.AERecord calledAeMeta, callingAeMeta;
         boolean isPullForUnknownEnabled, isPushForUnknownEnabled;
         synchronized(UnvSCP.this.emsowClientAets) {
-            callingAeMeta = UnvSCP.this.emsowClientAets.get(callingAet);
             calledAeMeta = UnvSCP.this.emsowServerAeMeta;
+            callingAeMeta = UnvSCP.this.emsowClientAets.get(callingAet);
             isPullForUnknownEnabled = UnvSCP.this.isPullForUnknownEnabled;
             isPushForUnknownEnabled = UnvSCP.this.isPushForUnknownEnabled;
         }
 
-        /* delete?
-        if(calledAeMeta == null) {
-            throw new DicomServiceException(Status.UnableToProcess, "Server AET '" + calledAet + "' is missing in PACS Clients Module");
+        if(calledAeMeta == null) { // impossible in normal case
+            calledAet = UnvWebClient.getCalledAetOverride(as.getCalledAET());
+            throw new DicomServiceException(
+                Status.UnableToProcess, "Server AET '" + calledAet + "' is missing in PACS Clients Module"
+            );
         }
-        */
-        //calledAet = calledAeMeta.getAET();
+        calledAet = calledAeMeta.getAET();
         if (isPush && !calledAeMeta.isPushEnabled()) {
             throw new DicomServiceException(
                 Status.UnableToProcess, "Pushing any data upon server with AET '" + calledAet + "' is not allowed"
@@ -602,7 +643,7 @@ public class UnvSCP implements UnvWebClientListener {
         } else {
             List<String> AllowedClients = calledAeMeta.getClients();
             boolean isClientAllowed = calledAeMeta.isUnknownAllowed()
-                || AllowedClients == null || AllowedClients.contains(callingAeMeta.getAET());
+                || AllowedClients == null || AllowedClients.contains(callingAeMeta.getID());
             if (isPush && !(callingAeMeta.isPushEnabled() && isClientAllowed)) {
                 throw new DicomServiceException(
                     Status.UnableToProcess, "Pushing any data from client with AET '" + callingAet + "' is not allowed"
@@ -1097,13 +1138,13 @@ public class UnvSCP implements UnvWebClientListener {
                         Collection<CAuthWebResponse.AERecord> ae_client_list = cawr.getClientsData();
                         if (ae_client_list != null) {
                             synchronized(main.emsowClientAets) {
-                                main.isPullForUnknownEnabled = cawr.isPullForUnknownEnabled();
-                                main.isPushForUnknownEnabled = cawr.isPushForUnknownEnabled();
                                 main.emsowServerAeMeta = cawr.getServerData();
                                 main.emsowClientAets.clear();
                                 for (CAuthWebResponse.AERecord aerec : ae_client_list) {
                                     main.emsowClientAets.put(aerec.getAET(), aerec);
                                 }
+                                main.isPullForUnknownEnabled = cawr.isPullForUnknownEnabled();
+                                main.isPushForUnknownEnabled = cawr.isPushForUnknownEnabled();
                             }
                             if(UnvSCP.isDynamicAEList) {
                                 synchronized(main.remoteConnections) {
@@ -1486,10 +1527,11 @@ public class UnvSCP implements UnvWebClientListener {
         throws ParseException {
 
         if (cl.hasOption("destination-override")) {
-
-            if (cl.getOptionValue("destination-override") == null || "".equals(cl.getOptionValue("destination-override"))) {
+            /* delete?
+            if (cl.getOptionValue("destination-override") == null) {
                 throw new ParseException("--destination-override cannot be empty");
             }
+            */
 
             if (!cl.hasOption("log-dir")
                 || !cl.hasOption("store-log")) {

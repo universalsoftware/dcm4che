@@ -18,6 +18,7 @@ public interface SenderTaskListener extends EventListener {
         Date patientDob
     );
 
-    void onProcessFile(String sopInstanceUid, String errMsg);
-    void doStudySummary();
+    void onStartProcessingFile(String sopInstanceUid);
+    void onFinishProcessingFile(String sopInstanceUid, String errMsg);
+    void onFinishProcessingBatch();
 }
