@@ -11,7 +11,7 @@ import javax.swing.table.DefaultTableCellRenderer;
  */
 public class ImagesCellRenderer extends DefaultTableCellRenderer {
     public ImagesCellRenderer() {
-        this.setHorizontalAlignment(RIGHT);
+        this.setHorizontalAlignment(CENTER);
     }
 
     @Override

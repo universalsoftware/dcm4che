@@ -4,6 +4,7 @@ package org.dcm4che3.tool.unvscp.gui;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.swing.table.DefaultTableModel;
 
@@ -12,11 +13,13 @@ import javax.swing.table.DefaultTableModel;
  * @author Pavel Varzinov <varzinov@yandex.ru>
  */
 public class ActivityTableModel extends DefaultTableModel {
+    public static final int PENDING = 0, SENDING = 1, SUCCESS = 2, FAILURE = 3;
+
     private static final String[] columnNames = {
-        "Date of Service", "Patient Name", "Date of Birth", "Study Desc.", "Images", "Status", "Progress", "Study UID", "SOP Instance UIDs", "Show Summary", "Processed"
+        "Date of Service", "Patient Name", "Date of Birth", "Study Desc.", "Images", "Status", "Progress", "Study UID", "SOP Instance UIDs", "Show Summary"
     };
     private static final Class[] columnClasses = {
-        Date.class, String.class, Date.class, String.class, Integer.class, Object.class, Object.class, String.class, Map.class, Boolean.class, Boolean.class
+        Date.class, String.class, Date.class, String.class, Integer.class, Object.class, Object.class, String.class, Map.class, Boolean.class
     };
 
     public static class NoSuchColumnNameException extends RuntimeException {
@@ -89,7 +92,9 @@ public class ActivityTableModel extends DefaultTableModel {
                 fileStatus[0] = false; // false + errMsg==null => new file; false + errMsg=="" => failue
                 fileStatus[1] = null;  // err msg
             }
-            /* Column "Status" is used to render the status */
+            if (getStatus(rowToUpdate) != SENDING) {
+                setValueAt(PENDING, rowToUpdate, "Status");
+            }
             /* Column "Progress" is used to render the progress */
             /* Column "Study UID" is not updated cause it contains the same studyInstanceUid */
             setValueAt(false, rowToUpdate, "Show Summary");
@@ -98,22 +103,24 @@ public class ActivityTableModel extends DefaultTableModel {
             sopInstanceUidMap = new HashMap<String, Object[]>();
             sopInstanceUidMap.put(sopInstanceUid, new Object[]{false, null}); // File status and status text
             Object[] record = new Object[]{
-                studyDate, patientName, patientDob, studyDescription, 1, null, null, studyInstanceUid, sopInstanceUidMap, false, false
+                studyDate, patientName, patientDob, studyDescription, 1, PENDING, null, studyInstanceUid, sopInstanceUidMap, false
             };
             insertRow(0, record);
         }
     }
 
-    public synchronized void markGroupAsProcessed(String sopInstanceUid) {
-        int row = findRowBySopInstanceUid(sopInstanceUid);
-        if (row > -1) {
-            setValueAt(true, row, "Processed");
-        }
-        this.fireTableRowsUpdated(row, row);
+    public synchronized int getStatus(int rowIndex) {
+        Object value = getValueAt(rowIndex, "Status");
+        int status = (value == null) ? PENDING : (Integer)value;
+        return status;
     }
 
-    public synchronized boolean isPending(int rowIndex) {
-        return !(Boolean)getValueAt(rowIndex, "Processed");
+    public synchronized void markGroupAsSending(String sopInstanceUid) {
+        int row = findRowBySopInstanceUid(sopInstanceUid);
+        if (row > -1 && getStatus(row) == PENDING) {
+            setValueAt(SENDING, row, "Status");
+        }
+        this.fireTableRowsUpdated(row, row);
     }
 
     public synchronized void transferProcessUpdate(String sopInstanceUid, String errMsg) {
@@ -124,6 +131,9 @@ public class ActivityTableModel extends DefaultTableModel {
 
             fileStatus[0] = errMsg == null;
             fileStatus[1] = errMsg;
+            if (errMsg != null) {
+                setValueAt(FAILURE, row, "Status");
+            }
 
             this.fireTableRowsUpdated(row, row);
             break;
@@ -188,6 +198,9 @@ public class ActivityTableModel extends DefaultTableModel {
         int row;
         for (row = 0; row < getRowCount(); row++) {
             setValueAt(true, row, "Show Summary");
+            if (getTotalNumberOfFiles(row) == getNumberOfSentFiles(row) && getNumberOfBadFiles(row) == 0) {
+                setValueAt(SUCCESS, row, "Status");
+            }
         }
         if (getRowCount() > 0) {
             this.fireTableRowsUpdated(0, row);
@@ -198,28 +211,29 @@ public class ActivityTableModel extends DefaultTableModel {
         return (Boolean)getValueAt(rowIndex, "Show Summary");
     }
 
-    public synchronized String[] getErrorsInfo(int rowIndex) {
-        /*HashMap<String, Integer> res = new HashMap<String, Integer>();
+    public synchronized LinkedHashMap<String, Integer> getErrorsInfo(int rowIndex) {
+        LinkedHashMap<String, Integer> res = null;
+
         Map<String, Object[]> sopInstances = (Map<String, Object[]>)getValueAt(rowIndex, "SOP Instance UIDs");
         for (Object[] sopInstance : sopInstances.values()) {
-            if (sopInstance[1] != null) {
-                if (res.containsKey(sopInstance[1])) {
-
+            String errMsgText = (String)sopInstance[1];
+            if (errMsgText != null) {
+                if (res == null) {
+                    res = new LinkedHashMap<String, Integer>();
+                }
+                if (res.containsKey(errMsgText)) {
+                    res.put(errMsgText, res.get(errMsgText) + 1);
                 } else {
-                    res.put(sopInstance[1], 1);
+                    res.put(errMsgText, 1);
                 }
             }
-            res += (!(Boolean)sopInstance[0] && sopInstance[1] != null) ? 1 : 0;
-        }*/
-        return new String[]{"Test1", "Test2"};
+        }
+        return res;
     }
 
     public synchronized boolean isSendingInProgress() {
         for (int rowIndex = 0; rowIndex < getRowCount(); rowIndex++) {
-            Map<String, Object[]> sopInstances = (Map<String, Object[]>)getValueAt(rowIndex, "SOP Instance UIDs");
-            for (Object[] sopInstance : sopInstances.values()) {
-                if (!(Boolean)sopInstance[0] && sopInstance[1] == null) { return true; }
-            }
+            if (getStatus(rowIndex) == SENDING) { return true; }
         }
         return false;
     }

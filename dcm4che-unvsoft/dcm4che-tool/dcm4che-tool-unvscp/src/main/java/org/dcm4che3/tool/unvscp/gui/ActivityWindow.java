@@ -22,31 +22,37 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
 
         TableColumnModel tcm = activityTable.getColumnModel();
         if (tcm.getColumnCount() > 0) {
-            tcm.getColumn(0).setMinWidth(70);
-            tcm.getColumn(0).setPreferredWidth(70);
-            tcm.getColumn(0).setMaxWidth(100);
+            // Column 0 is Date of Service
+            tcm.getColumn(0).setMinWidth(95);
+            tcm.getColumn(0).setPreferredWidth(95);
+            tcm.getColumn(0).setMaxWidth(120);
             tcm.getColumn(0).setCellRenderer(new DateCellRenderer());
+            // Column 1 is Patient Name
             tcm.getColumn(1).setMinWidth(150);
-            tcm.getColumn(1).setPreferredWidth(250);
-            tcm.getColumn(1).setMaxWidth(250);
-            tcm.getColumn(2).setMinWidth(70);
-            tcm.getColumn(2).setPreferredWidth(70);
-            tcm.getColumn(2).setMaxWidth(100);
+            tcm.getColumn(1).setPreferredWidth(350);
+            tcm.getColumn(1).setMaxWidth(350);
+            // Column 2 is Date of Birth
+            tcm.getColumn(2).setMinWidth(95);
+            tcm.getColumn(2).setPreferredWidth(95);
+            tcm.getColumn(2).setMaxWidth(120);
             tcm.getColumn(2).setCellRenderer(new DateCellRenderer());
+            // Column 3 is Study Description
             tcm.getColumn(3).setMinWidth(85);
             tcm.getColumn(3).setPreferredWidth(150);
-            tcm.getColumn(3).setMaxWidth(200);
+            tcm.getColumn(3).setMaxWidth(250);
+            // Column 4 is Images
             tcm.getColumn(4).setMinWidth(55);
             tcm.getColumn(4).setPreferredWidth(70);
             tcm.getColumn(4).setMaxWidth(75);
             tcm.getColumn(4).setCellRenderer(new ImagesCellRenderer());
+            // Column 5 is Status
             tcm.getColumn(5).setMinWidth(80);
             tcm.getColumn(5).setMaxWidth(80);
             tcm.getColumn(5).setCellRenderer(new StatusCellRenderer());
+            // Column 6 is Progress
             tcm.getColumn(6).setMinWidth(100);
             tcm.getColumn(6).setPreferredWidth(300);
             tcm.getColumn(6).setCellRenderer(new ProgressCellRenderer());
-            tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
@@ -73,6 +79,7 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("EMSOW Bridge");
+        setPreferredSize(new java.awt.Dimension(700, 525));
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent evt) {
                 formWindowClosing(evt);
@@ -90,14 +97,14 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 620, Short.MAX_VALUE)
+                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 680, Short.MAX_VALUE)
                 .addContainerGap())
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 458, Short.MAX_VALUE)
+                .addComponent(tableScroll, javax.swing.GroupLayout.DEFAULT_SIZE, 503, Short.MAX_VALUE)
                 .addContainerGap())
         );
 
@@ -138,7 +145,7 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
 
     @Override
     public void onStartProcessingFile(String sopInstanceUid) {
-        ((ActivityTableModel)activityTable.getModel()).markGroupAsProcessed(sopInstanceUid);
+        ((ActivityTableModel)activityTable.getModel()).markGroupAsSending(sopInstanceUid);
     }
 
     @Override

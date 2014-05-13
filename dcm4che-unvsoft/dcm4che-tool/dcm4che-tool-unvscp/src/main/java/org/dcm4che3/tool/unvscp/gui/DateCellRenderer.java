@@ -9,7 +9,7 @@ import javax.swing.table.DefaultTableCellRenderer;
  * @author Pavel Varzinov <varzinov@yandex.ru>
  */
 public class DateCellRenderer extends DefaultTableCellRenderer {
-    SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/YY");
+    SimpleDateFormat formatter = new SimpleDateFormat("MM/dd/YYYY");
 
     @Override
     public void setValue(Object value) {

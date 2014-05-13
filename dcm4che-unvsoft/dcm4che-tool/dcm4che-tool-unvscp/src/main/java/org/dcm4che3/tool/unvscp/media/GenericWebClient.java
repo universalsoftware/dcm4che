@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.SocketException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -112,13 +114,13 @@ public class GenericWebClient {
 
     //TODO make sure to replace values of existing cookies
     public void setCookie(String name, String value) {
-        //try {
-            //URI uriInstance = new URI(uri);
+        try {
+            URI uriInstance = new URI(uri);
             BasicClientCookie cookie = new BasicClientCookie(name , value);
-            //cookie.setDomain(uriInstance.getHost());
-            //cookie.setPath(uriInstance.getPath());
+            cookie.setDomain(uriInstance.getHost());
+            cookie.setPath(uriInstance.getPath());
             basicCookieStore.addCookie(cookie);
-        //} catch(URISyntaxException use) {}
+        } catch(URISyntaxException use) {}
     }
 
     public void attachFile(String key, File file) {
