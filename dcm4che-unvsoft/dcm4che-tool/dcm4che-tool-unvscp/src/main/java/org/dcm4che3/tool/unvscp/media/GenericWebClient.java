@@ -22,7 +22,9 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.CookieStore;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
@@ -45,6 +47,20 @@ import org.slf4j.LoggerFactory;
  */
 public class GenericWebClient {
     protected static final Logger LOG = LoggerFactory.getLogger(GenericWebClient.class);
+
+    private static String uploadingFilesHttpMethod = HttpPost.METHOD_NAME;
+    public static void setUploadingFilesHttpMethod(String method) {
+        if (HttpPost.METHOD_NAME.equalsIgnoreCase(method)) {
+            uploadingFilesHttpMethod = HttpPost.METHOD_NAME;
+        } else if (HttpPut.METHOD_NAME.equalsIgnoreCase(method)) {
+            uploadingFilesHttpMethod = HttpPut.METHOD_NAME;
+        } else {
+            throw new RuntimeException("\"" + (method == null ? "null" : method) + "\" requests are not supported by this application");
+        }
+    }
+    public static String getUploadingFilesHttpMethod() {
+        return uploadingFilesHttpMethod;
+    }
 
     private CloseableHttpClient httpClient;
     private CookieStore basicCookieStore = new BasicCookieStore();
@@ -129,6 +145,11 @@ public class GenericWebClient {
     }
 
     private void sendRequest(String uri, HttpEntity entity) throws IOException {
+        sendRequest(uri, entity, HttpPost.METHOD_NAME);
+    }
+
+    private void sendRequest(String uri, HttpEntity entity, String methodName) throws IOException {
+
         this.responseBody = null;
         if (this.responseInputStream != null) {
             try {
@@ -139,10 +160,18 @@ public class GenericWebClient {
             }
         }
 
-        HttpPost httpPost = new HttpPost(uri);
-        httpPost.setEntity(entity);
-        notifyListeners(new DetailedLogMessage("1", "Sending POST request", uri, params));
-        HttpResponse response = this.executePostRequest(httpClient, httpPost);
+        HttpEntityEnclosingRequestBase httpRequest;
+        if (HttpPost.METHOD_NAME.equalsIgnoreCase(methodName)) {
+            httpRequest = new HttpPost(uri);
+        } else if (HttpPut.METHOD_NAME.equalsIgnoreCase(methodName)) {
+            httpRequest = new HttpPut(uri);
+        } else {
+            throw new RuntimeException("\"" + methodName + "\" requests are not supported by this application");
+        }
+
+        httpRequest.setEntity(entity);
+        notifyListeners(new DetailedLogMessage("1", "Sending " + httpRequest.getMethod() + " request", uri, params));
+        HttpResponse response = this.executeHttpRequest(httpClient, httpRequest);
 
         int statusCode = response.getStatusLine().getStatusCode();
         Header location = response.getLastHeader("Location");
@@ -152,9 +181,16 @@ public class GenericWebClient {
             notifyListeners(new GenericWebResponse("1", "Request redirected to " + location.getValue(), 1));
 
             response.getEntity().getContent().close(); // We use this instead of httpPost.reset() to keep the connection alive
-            httpPost = new HttpPost(location.getValue());
-            httpPost.setEntity(entity);
-            response = this.executePostRequest(httpClient, httpPost);
+            if (HttpPost.METHOD_NAME.equalsIgnoreCase(methodName)) {
+                httpRequest = new HttpPost(location.getValue());
+            } else if (HttpPut.METHOD_NAME.equalsIgnoreCase(methodName)) {
+                httpRequest = new HttpPut(location.getValue());
+            } else {
+                throw new RuntimeException("\"" + methodName + "\" requests are not supported by this application");
+            }
+
+            httpRequest.setEntity(entity);
+            response = this.executeHttpRequest(httpClient, httpRequest);
 
             statusCode = response.getStatusLine().getStatusCode();
         }
@@ -185,19 +221,19 @@ public class GenericWebClient {
         if (this.responseBody != null) notifyListeners("WEB-RESPONSE BODY BEGIN", this.responseBody, "WEB-RESPONSE BODY END");
     }
 
-    private HttpResponse executePostRequest(HttpClient httpClient, HttpPost httpPost) throws IOException {
+    private HttpResponse executeHttpRequest(HttpClient httpClient, HttpEntityEnclosingRequestBase httpRequest) throws IOException {
         HttpResponse response = null;
         for (int i = this.connectionAttemptCount; i > 0; i--) {
             try {
-                response = httpClient.execute(httpPost);
+                response = httpClient.execute(httpRequest);
                 break;
             } catch(IOException ioe) {
                 if ((ioe instanceof HttpHostConnectException || ioe instanceof SocketException) && i > 1) {
                     notifyListeners(new GenericWebResponse("0", ioe.toString()));
                     // Sleep interval may be inserted here
                     int attemptNumber = this.connectionAttemptCount - i + 2;
-                    notifyListeners(new DetailedLogMessage("1", "Sending POST request (attempt " + attemptNumber + ")",
-                            httpPost.getURI().toString(), params));
+                    notifyListeners(new DetailedLogMessage("1", "Sending " + httpRequest.getMethod() + " request (attempt " + attemptNumber + ")",
+                            httpRequest.getURI().toString(), params));
                 } else {
                     throw ioe;
                 }
@@ -238,27 +274,18 @@ public class GenericWebClient {
     }
 
     public void uploadFiles() throws IOException {
+        uploadFiles(uploadingFilesHttpMethod);
+    }
+
+    public void uploadFiles(String methodName) throws IOException {
         try {
-            if (this.files.size() == 0) throw new DicomServiceException(Status.UnableToProcess, "No files for uploading");
-
-            MultipartEntityBuilder meb = MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-
-            Set<Entry<String, Object>> paramSet = params.entrySet();
-            for (Entry<String, Object> param : paramSet) {
-                Object value = param.getValue();
-                if (value instanceof String || value instanceof Number || value instanceof Character || value instanceof Boolean) {
-                    meb.addTextBody(param.getKey(), value.toString());
-                } else {
-                    meb.addTextBody(param.getKey(), new Gson().toJson(value));
-                }
+            HttpEntity httpEntity = null;
+            if (HttpPut.METHOD_NAME.equalsIgnoreCase(methodName)) {
+                httpEntity = prepareUnvSoftFileStreamEntity();
+            } else if (HttpPost.METHOD_NAME.equalsIgnoreCase(methodName)) {
+                httpEntity = prepareMultipartFileEntity();
             }
-
-            Set<Entry<String, File>> fileSet = files.entrySet();
-            for(Entry<String, File> attachment : fileSet) {
-                meb.addBinaryBody(attachment.getKey(), attachment.getValue());
-            }
-
-            sendRequest(this.uri, meb.build());
+            sendRequest(this.uri, httpEntity, methodName);
         } catch(DicomServiceException dse) {
             notifyListeners(new GenericWebResponse("0", dse.toString()));
             throw dse;
@@ -273,6 +300,56 @@ public class GenericWebClient {
             notifyListeners(new GenericWebResponse("0", e.toString()));
             throw new DicomServiceException(Status.UnableToProcess, e.toString());
         }
+    }
+
+    private HttpEntity prepareUnvSoftFileStreamEntity() {
+        if (this.files.isEmpty()) {
+            throw new RuntimeException("No files for uploading");
+        }
+
+        UnvSoftFileStreamEntityBuilder usBuilder = UnvSoftFileStreamEntityBuilder.create();
+
+        Set<Entry<String, Object>> paramSet = params.entrySet();
+        for (Entry<String, Object> param : paramSet) {
+            Object value = param.getValue();
+            if (value instanceof String || value instanceof Number || value instanceof Character || value instanceof Boolean) {
+                usBuilder.addTextHeader(param.getKey(), value.toString());
+            } else {
+                usBuilder.addTextHeader(param.getKey(), new Gson().toJson(value));
+            }
+        }
+
+        Set<Entry<String, File>> fileSet = files.entrySet();
+        for(Entry<String, File> attachment : fileSet) {
+            usBuilder.addFileParam(attachment.getKey(), attachment.getValue());
+        }
+
+        return usBuilder.build();
+    }
+
+    private HttpEntity prepareMultipartFileEntity() {
+        if (this.files.isEmpty()) {
+            throw new RuntimeException("No files for uploading");
+        }
+
+        MultipartEntityBuilder meBuilder = MultipartEntityBuilder.create().setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+
+        Set<Entry<String, Object>> paramSet = params.entrySet();
+        for (Entry<String, Object> param : paramSet) {
+            Object value = param.getValue();
+            if (value instanceof String || value instanceof Number || value instanceof Character || value instanceof Boolean) {
+                meBuilder.addTextBody(param.getKey(), value.toString());
+            } else {
+                meBuilder.addTextBody(param.getKey(), new Gson().toJson(value));
+            }
+        }
+
+        Set<Entry<String, File>> fileSet = files.entrySet();
+        for(Entry<String, File> attachment : fileSet) {
+            meBuilder.addBinaryBody(attachment.getKey(), attachment.getValue());
+        }
+
+        return meBuilder.build();
     }
 
     public String getResponseBody() {

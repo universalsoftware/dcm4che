@@ -72,6 +72,8 @@ import org.apache.commons.cli.MissingOptionException;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.PropertyConfigurator;
 import org.dcm4che3.data.Attributes;
@@ -870,6 +872,7 @@ public class UnvSCP implements UnvWebClientListener {
         addAsyncOptions(opts);
         addUploadDirOptions(opts);
         addCompressionOptions(opts);
+        addPushOptions(opts);
         addBridgeOptions(opts);
         addSessionOptions(opts);
         return CLIUtils.parseComandLine(args, opts, rb, UnvSCP.class);
@@ -949,6 +952,16 @@ public class UnvSCP implements UnvWebClientListener {
                 .withArgName("[0..9]")
                 .withDescription(rb.getString("compression"))
                 .withLongOpt("compression")
+                .create());
+    }
+
+    @SuppressWarnings("static-access")
+    private static void addPushOptions(Options opts) {
+        opts.addOption(OptionBuilder
+                .hasArg()
+                .withArgName("PUT|POST")
+                .withDescription(rb.getString("push-http-method"))
+                .withLongOpt("push-http-method")
                 .create());
     }
 
@@ -1095,6 +1108,7 @@ public class UnvSCP implements UnvWebClientListener {
             configureAsyncMode(main, cl);
             configureManualUploading(main, cl);
             configureCompression(main, cl);
+            configurePushMethod(main, cl);
             configureTransferCapability(main, cl);
             configureInstanceAvailability(main, cl);
             configureStgCmt(main, cl);
@@ -1342,6 +1356,23 @@ public class UnvSCP implements UnvWebClientListener {
                 throw new ParseException("--compression can not accept \"" + cl.getOptionValue("compression") + "\" (only integer values are allowed)");
             }
         }
+    }
+
+    private static void configurePushMethod(UnvSCP main, CommandLine cl) throws ParseException {
+        String method = null;
+        if (cl.hasOption("push-http-method") && !"".equals(method = cl.getOptionValue("push-http-method"))) {
+            if (HttpPost.METHOD_NAME.equalsIgnoreCase(method)) {
+                UnvWebClient.setUploadingFilesHttpMethod(HttpPost.METHOD_NAME);
+            } else if (HttpPut.METHOD_NAME.equalsIgnoreCase(method)) {
+                UnvWebClient.setUploadingFilesHttpMethod(HttpPut.METHOD_NAME);
+            } else {
+                throw new ParseException("--push-http-method accepts only POST|PUT. Method \"" + method + "\" is not supported.");
+            }
+        } else {
+            UnvWebClient.setUploadingFilesHttpMethod(HttpPut.METHOD_NAME);
+        }
+
+        LOG.info("Using http method \"{}\" for uploading files", UnvWebClient.getUploadingFilesHttpMethod());
     }
 
     private static void configureLog(UnvSCP main, CommandLine cl) throws ParseException, FileNotFoundException, IOException {
