@@ -27,17 +27,17 @@ class UnvSoftPutRequestStream extends InputStream {
     public static final String VERSION = "UPT0";
 
     byte[] header;
-    List<UnvSoftParam> unvSoftParams;
+    List<UnvSoftParamStream> unvSoftParams;
     int headerPos = 0, paramsPos = 0;
 
     public UnvSoftPutRequestStream(Map<String, String> textHeaders, Map<String, File> files) {
-        unvSoftParams = new ArrayList<UnvSoftParam>();
+        unvSoftParams = new ArrayList<UnvSoftParamStream>();
         for(Map.Entry<String, String> e : textHeaders.entrySet()) {
-            unvSoftParams.add(new UnvSoftParam(e.getKey(), e.getValue()));
+            unvSoftParams.add(new UnvSoftParamStream(e.getKey(), e.getValue()));
         }
         for(Map.Entry<String, File> e : files.entrySet()) {
-            unvSoftParams.add(new UnvSoftParam(e.getKey() + "_FILE_NAME", e.getValue().getName()));
-            unvSoftParams.add(new UnvSoftParam(e.getKey(), e.getValue()));
+            unvSoftParams.add(new UnvSoftParamStream(e.getKey() + "_FILE_NAME", e.getValue().getName()));
+            unvSoftParams.add(new UnvSoftParamStream(e.getKey(), e.getValue()));
         }
 
         // 4 b. - protocol version; 4 b. - number of params
@@ -61,37 +61,73 @@ class UnvSoftPutRequestStream extends InputStream {
         return value;
     }
 
-    public static class UnvSoftParam {
+    @Override
+    public int read(byte b[], int off, int len) throws IOException {
+        if (b == null) {
+            throw new NullPointerException();
+        } else if (off < 0 || len < 0 || len > b.length - off) {
+            throw new IndexOutOfBoundsException();
+        } else if (len == 0) {
+            return 0;
+        }
+
+        int bytesRead = 0;
+        if (headerPos < header.length) {
+            if (len <= header.length - headerPos) {
+                System.arraycopy(header, headerPos, b, off, len);
+                headerPos += len;
+                return len;
+            } else {
+                bytesRead = header.length - headerPos;
+                System.arraycopy(header, headerPos, b, off, bytesRead);
+                headerPos += bytesRead;
+            }
+        }
+
+        while(paramsPos < unvSoftParams.size() && bytesRead < len) {
+            int result = unvSoftParams.get(paramsPos).read(b, off + bytesRead, len - bytesRead);
+            if (result > -1) {
+                bytesRead += result;
+            } else {
+                paramsPos++;
+            }
+        }
+
+        return bytesRead > 0 ? bytesRead : -1;
+    }
+
+    public static class UnvSoftParamStream extends InputStream {
         private static final int UTF8_TEXT = 0;
         private static final int BINARY_DATA = 1;
 
         private final byte[] meta;
         private final byte[] data;
-        private final FileInputStream fis;
-        private final int fileSize;
+        private final File file;
+        private final FileInputStream fileInputStream;
+        //private final int fileSize;
         private int metaPos, dataPos;
 
-        public UnvSoftParam(String name, String value) {
+        public UnvSoftParamStream(String name, String value) {
             meta = createParamMeta(name, UTF8_TEXT);
             byte[] valueInBytes = value.getBytes(Charset.forName("utf8"));
             System.arraycopy(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value.length()).array(), 0, meta, 8, 4);
             data = valueInBytes;
-            fis = null;
-            fileSize = 0;
+            file = null;
+            fileInputStream = null;
         }
 
-        public UnvSoftParam(String name, File file) {
+        public UnvSoftParamStream(String name, File file) {
             meta = createParamMeta(name, BINARY_DATA);
-            fileSize = (int)file.length();
-            System.arraycopy(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(fileSize).array(), 0, meta, 8, 4);
+            this.file = file;
+            System.arraycopy(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt((int)this.file.length()).array(), 0, meta, 8, 4);
             data = null;
-            FileInputStream fileInputStream;
+            FileInputStream fis;
             try {
-                fileInputStream = new FileInputStream(file);
+                fis = new FileInputStream(file);
             } catch(FileNotFoundException fnfe) {
-                fileInputStream = null;
+                fis = null;
             }
-            fis = fileInputStream;
+            fileInputStream = fis;
         }
 
         private byte[] createParamMeta(String paramName, int paramType) {
@@ -108,24 +144,75 @@ class UnvSoftPutRequestStream extends InputStream {
             return paramMeta;
         }
 
-        public int read() {
+        @Override
+        public int read() throws IOException {
+            int result;
+
             if(meta != null && metaPos < meta.length) {
-                return meta[metaPos++] & 255;
+                result = meta[metaPos++] & 255;
             } else if (data != null && dataPos < data.length) {
-                return data[dataPos++] & 255;
-            } else if (fis != null) {
-                try {
-                    return fis.read();
-                } catch(IOException ioe) {
-                    return -1;
-                }
+                result = data[dataPos++] & 255;
+            } else if (fileInputStream != null) {
+                result = fileInputStream.read();
             } else {
+                result = -1;
+            }
+
+            if (result < 0 && fileInputStream != null) {
+                fileInputStream.close();
+            }
+
+            return result;
+        }
+
+        @Override
+        public int read(byte b[], int off, int len) throws IOException {
+            if (b == null) {
+                throw new NullPointerException();
+            } else if (off < 0 || len < 0 || len > b.length - off) {
+                throw new IndexOutOfBoundsException();
+            } else if (len == 0) {
+                return 0;
+            }
+
+            if (meta == null) {
                 return -1;
             }
+            int bytesRead = 0;
+            if (metaPos < meta.length) {
+                if (len <= meta.length - metaPos) {
+                    System.arraycopy(meta, metaPos, b, off, len);
+                    metaPos += len;
+                    return len;
+                } else {
+                    bytesRead = meta.length - metaPos;
+                    System.arraycopy(meta, metaPos, b, off, bytesRead);
+                    metaPos += bytesRead;
+                }
+            }
+
+            if (data != null && dataPos < data.length) {
+                int dataBytesRead = dataPos + len - bytesRead <= data.length ? len - bytesRead : data.length - dataPos;
+                System.arraycopy(data, dataPos, b, off + bytesRead, dataBytesRead);
+                dataPos += dataBytesRead;
+                return bytesRead + dataBytesRead;
+            }
+
+            if (fileInputStream != null) {
+                int result = fileInputStream.read(b, off + bytesRead, len - bytesRead);
+                if (result > -1) {
+                    return bytesRead + result;
+                } else {
+                    fileInputStream.close();
+                    return -1;
+                }
+            }
+
+            return bytesRead > 0 ? bytesRead : -1;
         }
 
         public int getLength() {
-            return (meta == null ? 0 : meta.length) + (data == null ? 0 : data.length) + fileSize;
+            return (meta == null ? 0 : meta.length) + (data == null ? 0 : data.length) + (file == null ? 0 : (int)file.length());
         }
 
         @Override
@@ -133,7 +220,7 @@ class UnvSoftPutRequestStream extends InputStream {
             int paramType = ByteBuffer.wrap(meta, 0, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
             int nameLength = ByteBuffer.wrap(meta, 4, 4).order(ByteOrder.LITTLE_ENDIAN).getInt();
             String name = new String(meta, 12, nameLength, Charset.forName("utf8"));
-            String value = data == null ? "[INPUT STREAM: " + (fis == null ? "null" : "SIZE=" + fileSize) + "]" : new String(data, Charset.forName("utf8"));
+            String value = data == null ? "[INPUT STREAM: " + (file == null ? "null" : "SIZE=" + (int)file.length()) + "]" : new String(data, Charset.forName("utf8"));
             return (paramType == 0 ? "UTF8_TEXT" : (paramType == 1 ? "BINARY_DATA" : "UNKNOWN")) + ": " + name + "=" + value;
         }
     }

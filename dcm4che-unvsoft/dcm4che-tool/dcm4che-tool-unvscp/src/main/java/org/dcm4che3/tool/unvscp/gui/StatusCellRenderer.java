@@ -2,6 +2,7 @@
 package org.dcm4che3.tool.unvscp.gui;
 
 import java.awt.Component;
+import java.awt.FontMetrics;
 import java.net.URL;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
@@ -18,6 +19,8 @@ public class StatusCellRenderer extends DefaultTableCellRenderer {
     private final ImageIcon sendingIcon;
     private final ImageIcon failureIcon;
     private final ImageIcon successIcon;
+
+    private final FontMetrics thisFontMetrics = this.getFontMetrics(this.getFont());
 
     public StatusCellRenderer() {
         URL pendingIconResource = getClass().getClassLoader().getResource("org/dcm4che3/tool/unvscp/icons/clock.png");
@@ -59,8 +62,13 @@ public class StatusCellRenderer extends DefaultTableCellRenderer {
                 if (errorsInfo != null && errorsInfo.size() > 0) {
                     String toolTipText = "<html><table style=\"border:none;border-spacing:0;border-collapse:collapse;margin:0;\">";
                     for (Entry<String, Integer> e : errorsInfo.entrySet()) {
-                        toolTipText += "<tr><th style=\"text-align:right;padding:0 3px 0 0;\">" + e.getValue() + " file" + (e.getValue() != 1 ? "s" : "")
-                                + ":</th><td style=\"color:#a52a2a;padding:0;\">" + e.getKey() + "</td></tr>";
+                        toolTipText += "<tr><th style=\"text-align:right;padding:0 3px 0 0;\" valign=\"top\">"
+                                    + e.getValue()
+                                + " file" + (e.getValue() != 1 ? "s" : "") + ":</th>"
+                                + "<td style=\"color:#a52a2a;padding:0;" + (getStringWidth(e.getKey()) > 300 ? "width:300px;" : "")
+                                    + "\" valign=\"top\">"
+                                        + e.getKey()
+                                + "</td></tr>";
                     }
                     this.setToolTipText(toolTipText);
                 } else {
@@ -74,5 +82,9 @@ public class StatusCellRenderer extends DefaultTableCellRenderer {
         }
 
         return this;
+    }
+
+    private int getStringWidth(String str) {
+        return thisFontMetrics.stringWidth(str);
     }
 }

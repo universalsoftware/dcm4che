@@ -22,7 +22,11 @@ public class ImagesCellRenderer extends DefaultTableCellRenderer {
         int numberOfSentFiles = ((ActivityTableModel)table.getModel()).getNumberOfSentFiles(row);
         int totalNumberOfFiles = ((ActivityTableModel)table.getModel()).getTotalNumberOfFiles(row);
 
-        setValue(numberOfSentFiles + "/" + totalNumberOfFiles);
+        String renderValue = "<html><table style=\"border:none;border-spacing:0;border-collapse:collapse;margin:0;\"><tr>"
+                + "<td style=\"padding:0;\"><div style=\"width:25px;text-align:right;\">" + numberOfSentFiles + "</div></td>"
+                + "<td style=\"padding:0;\"><div>/</div></td>"
+                + "<td style=\"padding:0;\"><div style=\"width:25px;\">" + totalNumberOfFiles + "</div></td>";
+        setValue(renderValue);
         setToolTipText("<html>Total: <b>" + totalNumberOfFiles);
         return this;
     }

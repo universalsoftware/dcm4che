@@ -41,16 +41,16 @@ public class ActivityWindow extends javax.swing.JFrame implements SenderTaskList
             tcm.getColumn(3).setPreferredWidth(150);
             tcm.getColumn(3).setMaxWidth(250);
             // Column 4 is Images
-            tcm.getColumn(4).setMinWidth(55);
-            tcm.getColumn(4).setPreferredWidth(70);
-            tcm.getColumn(4).setMaxWidth(75);
+            tcm.getColumn(4).setMinWidth(82);
+            tcm.getColumn(4).setPreferredWidth(82);
+            tcm.getColumn(4).setMaxWidth(105);
             tcm.getColumn(4).setCellRenderer(new ImagesCellRenderer());
             // Column 5 is Status
             tcm.getColumn(5).setMinWidth(80);
             tcm.getColumn(5).setMaxWidth(80);
             tcm.getColumn(5).setCellRenderer(new StatusCellRenderer());
             // Column 6 is Progress
-            tcm.getColumn(6).setMinWidth(100);
+            tcm.getColumn(6).setMinWidth(73);
             tcm.getColumn(6).setPreferredWidth(300);
             tcm.getColumn(6).setCellRenderer(new ProgressCellRenderer());
             tcm.removeColumn(tcm.getColumn(tcm.getColumnCount() - 1));
