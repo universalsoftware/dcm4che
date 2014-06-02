@@ -58,11 +58,13 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -107,6 +109,7 @@ import org.dcm4che3.net.pdu.AAssociateAC;
 import org.dcm4che3.net.pdu.AAssociateRQ;
 import org.dcm4che3.net.pdu.ExtendedNegotiation;
 import org.dcm4che3.net.pdu.PresentationContext;
+import org.dcm4che3.net.pdu.RoleSelection;
 import org.dcm4che3.net.service.AbstractDicomService;
 import org.dcm4che3.net.service.BasicCEchoSCP;
 import org.dcm4che3.net.service.BasicCFindSCP;
@@ -186,6 +189,8 @@ public class UnvSCP implements UnvWebClientListener {
     private final Map<String, Connection> remoteConnections = Collections.synchronizedMap(new HashMap<String, Connection>());
     private CAuthWebResponse.AERecord emsowServerAeMeta;
     private final Map<String, CAuthWebResponse.AERecord> emsowClientAets = Collections.synchronizedMap(new HashMap<String, CAuthWebResponse.AERecord>());
+    private final Set<ExtendedNegotiation> extendedNegotiaions = new LinkedHashSet<ExtendedNegotiation>();
+    private final Set<RoleSelection> roleSelections = new LinkedHashSet<RoleSelection>();
     private boolean isPushForUnknownEnabled, isPullForUnknownEnabled;
     private boolean allowUnknown = false;
     private boolean async = false;
@@ -1110,6 +1115,7 @@ public class UnvSCP implements UnvWebClientListener {
             configureCompression(main, cl);
             configurePushMethod(main, cl);
             configureTransferCapability(main, cl);
+            configureRoleSelectionsAndExtendedNegotiations(main, cl);
             configureInstanceAvailability(main, cl);
             configureStgCmt(main, cl);
             configureSendPending(main, cl);
@@ -1183,7 +1189,14 @@ public class UnvSCP implements UnvWebClientListener {
                                                   e.getMessage());
                     }
 
-                    return super.negotiate(as, rq);
+                    AAssociateAC ac = super.negotiate(as, rq);
+                    for (RoleSelection rs : main.roleSelections) {
+                        ac.addRoleSelection(rs);
+                    }
+                    for (ExtendedNegotiation extNeg : main.extendedNegotiaions) {
+                        ac.addExtendedNegotiation(extNeg);
+                    }
+                    return ac;
                 }
             });
 
@@ -1553,6 +1566,33 @@ public class UnvSCP implements UnvWebClientListener {
         else
             main.openDicomDirForReadOnly();
      }
+
+    /**
+     * Since we store the meta data in the db we should use the relational (not hierarchical) model
+     * to check for missing attributes in the association request
+     * for retrieving images by C-GET/C-MOVE or querying by C-FIND.<br>
+     * Key "<b>--relational</b>" now has effect. Always use it when launching UnvSCP. <br><br>
+     * Config file <b>storage-sop-classes.properties</b> is now also used for creating role selections
+     * that enable to transfer specific sop classes via C-GET
+     */
+    private static void configureRoleSelectionsAndExtendedNegotiations(UnvSCP main, CommandLine cl) {
+        for (TransferCapability tc : main.ae.getTransferCapabilitiesWithRole(TransferCapability.Role.SCP)) {
+            EnumSet<QueryOption> queryOpts = tc.getQueryOptions();
+            /**
+             * if queryOpts == null then we are dealing with storage sop classes for which we have to create role selections,
+             * otherwise it's about query or retrieve sop classes for which we have to create extended negotiations containing the queryOpts
+             */
+            if (queryOpts == null) {
+                main.roleSelections.add(new RoleSelection(tc.getSopClass(), true, true));
+            } else {
+                if (!queryOpts.isEmpty()) {
+                    main.extendedNegotiaions.add(
+                        new ExtendedNegotiation(tc.getSopClass(), QueryOption.toExtendedNegotiationInformation(queryOpts))
+                    );
+                }
+            }
+        }
+    }
 
     private static void configureDestinationOverride(UnvSCP main, CommandLine cl)
         throws ParseException {
