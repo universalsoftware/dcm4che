@@ -82,7 +82,7 @@ public class GenericRetrieveTask extends BasicRetrieveTask {
 
         webClient.sendPostRequest();
 
-        GenericWebResponse gwr = new GenericWebResponse("1", "Parsing of file: name=" + inst.uri + "; MediaStorageSOPClassUID=" + inst.cuid + "; MediaStorageSOPInstanceUID=" + inst.iuid + "; TransferSyntaxUID=" + inst.tsuid);
+        GenericWebResponse gwr = new GenericWebResponse("1", "Parsing of file: MediaStorageSOPClassUID=" + inst.cuid + "; MediaStorageSOPInstanceUID=" + inst.iuid + "; TransferSyntaxUID=" + inst.tsuid);
         this.webClientListener.logMessage(this.clientMetaInfo, this.serviceCommand, gwr);
 
         return new DicomInputStream(webClient.getResponseInputStream());
